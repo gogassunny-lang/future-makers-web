@@ -38,46 +38,70 @@
   input { font-family: inherit; }
 
   /* ---------- LOGIN (split panel) ---------- */
-  .login-wrap { min-height: 100vh; display: grid; grid-template-columns: 1.05fr 1fr; }
+  .login-wrap { min-height: 100vh; display: grid; grid-template-columns: 1.1fr 1fr; }
   .login-brandside {
-    background: var(--ink); color: #fff; padding: 56px 56px; position: relative; overflow: hidden;
+    background:
+      radial-gradient(circle at 78% 30%, rgba(214,90,30,.20) 0, transparent 45%),
+      radial-gradient(circle at 20% 85%, rgba(214,90,30,.10) 0, transparent 40%),
+      var(--ink);
+    color: #fff; padding: 52px 56px; position: relative; overflow: hidden;
     display: flex; flex-direction: column;
   }
-  .login-brandside::after {
-    content: ''; position: absolute; right: -120px; top: 50%; transform: translateY(-50%);
-    width: 460px; height: 460px; border-radius: 50%;
-    background: radial-gradient(circle, rgba(214,90,30,.22) 0, transparent 62%);
+  .login-brandside::before {
+    content:''; position:absolute; inset:0;
+    background-image: radial-gradient(rgba(255,255,255,.04) 1px, transparent 1px);
+    background-size: 22px 22px; pointer-events:none;
   }
-  .lb-logo { display: flex; align-items: center; gap: 11px; position: relative; z-index: 1; }
-  .lb-logo .nm { font-weight: 700; font-size: 19px; letter-spacing: -.02em; }
-  .lb-mid { margin-top: auto; margin-bottom: auto; position: relative; z-index: 1; }
-  .lb-eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--signal); margin-bottom: 18px; }
-  .lb-head { font-size: 38px; font-weight: 800; line-height: 1.08; letter-spacing: -.03em; margin-bottom: 18px; }
+  .lb-logo { display: flex; align-items: center; gap: 12px; position: relative; z-index: 1; }
+  .lb-logo .nm { font-weight: 700; font-size: 20px; letter-spacing: -.02em; }
+  .lb-mid { margin-top: 38px; position: relative; z-index: 1; }
+  .lb-eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--signal); margin-bottom: 16px; }
+  .lb-head { font-size: 34px; font-weight: 800; line-height: 1.1; letter-spacing: -.03em; margin-bottom: 14px; }
   .lb-head .o { color: var(--signal); }
-  .lb-sub { font-size: 15px; color: #aeb6bf; max-width: 380px; line-height: 1.55; }
-  .lb-feats { margin-top: 30px; display: flex; flex-direction: column; gap: 12px; }
-  .lb-feat { display: flex; align-items: center; gap: 11px; font-size: 13.5px; color: #cdd3d9; }
-  .lb-feat .fk { width: 22px; height: 22px; border-radius: 6px; background: rgba(214,90,30,.18); color: var(--signal); display: grid; place-items: center; font-size: 12px; flex: none; }
-  .lb-foot { position: relative; z-index: 1; font-size: 12px; color: #6b747d; }
+  .lb-sub { font-size: 14.5px; color: #aeb6bf; max-width: 400px; line-height: 1.55; }
+
+  /* animated message demo */
+  .demo-phone { margin-top: 34px; position: relative; z-index: 1; max-width: 330px; }
+  .demo-screen { background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08); border-radius: 16px; padding: 16px; }
+  .demo-head { display:flex; align-items:center; gap:9px; padding-bottom:12px; border-bottom:1px solid rgba(255,255,255,.07); margin-bottom:14px; }
+  .demo-av { width:30px; height:30px; border-radius:50%; background:var(--signal); display:grid; place-items:center; flex:none; }
+  .demo-nm { font-size:13px; font-weight:600; color:#e9edef; }
+  .demo-st { font-size:10.5px; color:#8696a0; }
+  .demo-bubble {
+    background:#005c4b; border-radius:9px; border-top-right-radius:3px; padding:9px 11px 6px; max-width:88%;
+    margin-left:auto; box-shadow:0 1px 1px rgba(0,0,0,.2); opacity:0; transform:translateY(8px);
+    animation: bubbleIn .5s ease forwards;
+  }
+  .demo-bubble.b2 { animation-delay:1.6s; }
+  .demo-file { display:flex; align-items:center; gap:9px; background:rgba(0,0,0,.18); border-radius:6px; padding:8px 10px; margin-bottom:6px; }
+  .demo-file .fi { width:26px; height:26px; border-radius:5px; background:rgba(255,255,255,.12); display:grid; place-items:center; font-size:13px; flex:none; }
+  .demo-file .fn { font-size:11.5px; color:#cfd9de; font-weight:600; }
+  .demo-file .fs { font-size:10px; color:#8696a0; }
+  .demo-txt { font-size:13px; color:#e9edef; line-height:1.4; }
+  .demo-meta { font-size:9.5px; color:#8696a0; text-align:right; margin-top:3px; display:flex; gap:3px; justify-content:flex-end; align-items:center; }
+  .tick { color:#8696a0; transition: color .4s; }
+  .tick.blue { color:#53bdeb; }
+  @keyframes bubbleIn { to { opacity:1; transform:translateY(0); } }
+  .lb-foot { margin-top:auto; position: relative; z-index: 1; font-size: 12px; color: #6b747d; padding-top: 24px; }
 
   .login-formside { display: grid; place-items: center; padding: 40px; background: var(--paper); }
-  .login-card { width: 100%; max-width: 360px; }
+  .login-card { width: 100%; max-width: 350px; }
   .login-card .lc-logo { display: none; }
-  .login-card h1 { font-size: 25px; font-weight: 700; letter-spacing: -.02em; margin-bottom: 5px; }
-  .login-card .sub { color: var(--ink-soft); font-size: 14px; margin-bottom: 26px; }
+  .login-card h1 { font-size: 26px; font-weight: 800; letter-spacing: -.025em; margin-bottom: 5px; }
+  .login-card .sub { color: var(--ink-soft); font-size: 14px; margin-bottom: 28px; }
   label.field { display: block; margin-bottom: 16px; }
   label.field span { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-soft); margin-bottom: 6px; font-weight: 600; }
   .input { width: 100%; padding: 12px 13px; border: 1px solid var(--line-strong); border-radius: 9px; font-size: 14.5px; background: var(--panel); transition: border-color .15s, box-shadow .15s; }
   .input:focus { outline: none; border-color: var(--signal); box-shadow: 0 0 0 3px var(--signal-dim); }
-  .btn-primary { width: 100%; padding: 13px; background: var(--ink); color: #fff; border-radius: 9px; font-weight: 600; font-size: 14.5px; letter-spacing: -.01em; transition: transform .08s, background .15s; }
-  .btn-primary:hover { background: #000; }
+  .btn-primary { width: 100%; padding: 13px; background: var(--signal); color: #fff; border-radius: 9px; font-weight: 700; font-size: 14.5px; letter-spacing: -.01em; transition: transform .08s, background .15s, box-shadow .15s; box-shadow: 0 6px 18px rgba(214,90,30,.28); }
+  .btn-primary:hover { background: #c44e15; box-shadow: 0 8px 22px rgba(214,90,30,.36); }
   .btn-primary:active { transform: translateY(1px); }
-  .btn-primary:disabled { opacity: .55; cursor: not-allowed; }
+  .btn-primary:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; }
   .err { color: var(--stop); font-size: 13px; margin-top: 12px; min-height: 18px; }
-  @media (max-width: 840px) {
+  @media (max-width: 860px) {
     .login-wrap { grid-template-columns: 1fr; }
     .login-brandside { display: none; }
-    .login-card .lc-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; }
+    .login-card .lc-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 26px; }
     .login-card .lc-logo .nm { font-weight: 700; font-size: 18px; }
   }
 
@@ -335,15 +359,18 @@ const { API_BASE, SUPABASE_URL, SUPABASE_ANON_KEY } = window.FM_CONFIG;
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const root = document.getElementById('root');
 
-// FM logo mark (recolors via currentColor on the wrapper)
-const FM_MARK = (size=30, color='#D65A1E') => `<svg width="${size}" height="${Math.round(size*0.87)}" viewBox="0 0 124 108" xmlns="http://www.w3.org/2000/svg" style="display:block">
-  <g fill="${color}">
-    <path d="M16 24 h40 l-9 14 h-31 z"/><path d="M16 24 h14 v60 h-14 z"/>
-    <path d="M46 46 h14 v38 h-14 z"/><path d="M44 56 h34 v12 h-34 z"/><path d="M72 47 l22 15 l-22 15 z"/>
-  </g>
-  <g stroke="${color}" fill="none" stroke-width="7" stroke-linecap="round">
-    <path d="M96 36 a46 46 0 0 1 0 52"/><path d="M106 24 a62 62 0 0 1 0 76"/>
-  </g></svg>`;
+// FM logo — broadcast signal mark in a rounded tile.
+// tile=true draws the orange rounded square; else just the glyph in `color`.
+const FM_MARK = (size=34, opts={}) => {
+  const { tile=true, glyph='#fff', tileColor='#D65A1E' } = opts;
+  const inner = `<svg width="${Math.round(size*0.62)}" height="${Math.round(size*0.62)}" viewBox="0 0 28 28" fill="none" style="display:block">
+    <circle cx="9" cy="14" r="3.2" fill="${tile?glyph:tileColor}"/>
+    <path d="M14.5 8 a8 8 0 0 1 0 12" stroke="${tile?glyph:tileColor}" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+    <path d="M18.5 4.5 a13 13 0 0 1 0 19" stroke="${tile?glyph:tileColor}" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+  </svg>`;
+  if (!tile) return inner;
+  return `<span style="width:${size}px;height:${size}px;border-radius:${Math.round(size*0.26)}px;background:${tileColor};display:inline-grid;place-items:center;flex:none">${inner}</span>`;
+};
 
 let state = { user: null, profile: null, page: 'lists', lists: [], activeList: null, activeReport: null, contacts: [] };
 
@@ -366,21 +393,28 @@ function renderLogin(errMsg){
   root.innerHTML = `
   <div class="login-wrap">
     <div class="login-brandside">
-      <div class="lb-logo">${FM_MARK(30,'#fff')}<div class="nm">Future Makers</div></div>
+      <div class="lb-logo">${FM_MARK(38)}<div class="nm">Future Makers</div></div>
       <div class="lb-mid">
         <div class="lb-eyebrow">Automate · Broadcast · Stay aligned</div>
         <div class="lb-head">End manual reminders.<br><span class="o">Keep every team aligned.</span></div>
-        <div class="lb-sub">Drop a message and a file, pick who gets it, set how often — Future Makers sends it on WhatsApp automatically, and tracks who saw it.</div>
-        <div class="lb-feats">
-          <div class="lb-feat"><span class="fk">✓</span>Automated WhatsApp broadcasts on schedule</div>
-          <div class="lb-feat"><span class="fk">✓</span>Delivery, read &amp; reply tracking per person</div>
-          <div class="lb-feat"><span class="fk">✓</span>Excel contact upload &amp; broadcast groups</div>
-        </div>
+        <div class="lb-sub">Drop a message and a file, pick who gets it, set how often — it goes out on WhatsApp automatically, and you see exactly who read it.</div>
+        <div class="demo-phone"><div class="demo-screen">
+          <div class="demo-head"><div class="demo-av">${FM_MARK(20,{tile:false,tileColor:'#fff'})}</div><div><div class="demo-nm">Future Makers</div><div class="demo-st">business account · now</div></div></div>
+          <div class="demo-bubble">
+            <div class="demo-file"><span class="fi">📄</span><div><div class="fn">Daily_Instructions.pdf</div><div class="fs">PDF · 1.2 MB</div></div></div>
+            <div class="demo-txt">Good morning team! Today's targets and safety checklist attached. 🎯</div>
+            <div class="demo-meta">09:00 <span class="tick" id="dtick">✓✓</span></div>
+          </div>
+          <div class="demo-bubble b2">
+            <div class="demo-txt">Acknowledged 👍</div>
+            <div class="demo-meta">09:04 <span class="tick blue">✓✓</span></div>
+          </div>
+        </div></div>
       </div>
-      <div class="lb-foot">Built for operations teams.</div>
+      <div class="lb-foot">Built for operations teams across India.</div>
     </div>
     <div class="login-formside"><div class="login-card">
-      <div class="lc-logo">${FM_MARK(28,'#D65A1E')}<div class="nm">Future Makers</div></div>
+      <div class="lc-logo">${FM_MARK(34)}<div class="nm">Future Makers</div></div>
       <h1>Sign in</h1>
       <p class="sub">Welcome back. Enter your details to continue.</p>
       <label class="field"><span>Email</span><input class="input" id="email" type="email" autocomplete="username" placeholder="you@company.com"/></label>
@@ -401,6 +435,8 @@ function renderLogin(errMsg){
   };
   btn.onclick = doLogin;
   document.getElementById('password').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+  // demo: first message ticks turn blue (read) after a beat
+  setTimeout(()=>{ const t=document.getElementById('dtick'); if(t) t.classList.add('blue'); }, 1400);
 }
 
 // ---------- SHELL ----------
@@ -410,7 +446,7 @@ function renderShell(inner){
   root.innerHTML = `
   <div class="shell">
     <aside class="side">
-      <div class="brand">${FM_MARK(26,'#D65A1E')}<div class="brand-name" style="color:#fff">Future Makers</div></div>
+      <div class="brand">${FM_MARK(30)}<div class="brand-name" style="color:#fff">Future Makers</div></div>
       ${navItem('instruction','New Instruction')}
       ${navItem('campaigns','Campaigns')}
       ${navItem('lists','Broadcast Lists')}
