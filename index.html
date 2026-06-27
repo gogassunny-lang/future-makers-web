@@ -220,6 +220,81 @@
   .back-link { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-soft); font-size: 13px; font-weight: 500; margin-bottom: 14px; }
   .back-link:hover { color: var(--signal); }
 
+  /* ---------- INSTRUCTION BUILDER ---------- */
+  .builder { display: grid; grid-template-columns: 1fr 360px; gap: 28px; align-items: start; }
+  .build-col { display: flex; flex-direction: column; gap: 20px; }
+  .field-block { background: var(--panel); border: 1px solid var(--line); border-radius: 13px; padding: 20px; box-shadow: var(--shadow); }
+  .field-block > label.cap { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-soft); margin-bottom: 10px; font-weight: 600; }
+  .src-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+  .src-tab {
+    flex: 1; padding: 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: #fdfcfa;
+    display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ink-soft); transition: all .14s;
+  }
+  .src-tab .si { font-size: 20px; }
+  .src-tab.active { border-color: var(--signal); background: var(--signal-dim); color: var(--signal); }
+  .src-tab:hover:not(.active) { border-color: var(--ink-soft); }
+  .src-tab.soon { opacity: .65; cursor: default; }
+  .src-tab .soon-tag { font-size: 9px; background: var(--line); color: var(--ink-soft); padding: 1px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: .05em; }
+  .filepick {
+    border: 1.5px dashed var(--line-strong); border-radius: 11px; padding: 24px 18px; text-align: center;
+    background: #fdfcfa; cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  .filepick:hover, .filepick.over { border-color: var(--signal); background: var(--signal-dim); }
+  .filepick .fi { font-size: 24px; margin-bottom: 8px; }
+  .filepick p { font-size: 13.5px; color: var(--ink-soft); }
+  .filepick b { color: var(--signal); }
+  .chosen { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--go-dim); border: 1px solid #c5e3d3; border-radius: 10px; font-size: 13.5px; }
+  .chosen .cx { margin-left: auto; color: var(--ink-soft); cursor: pointer; font-size: 16px; }
+  .chosen .cx:hover { color: var(--stop); }
+  textarea.input { resize: vertical; min-height: 90px; line-height: 1.5; }
+  .cover-row { display: flex; align-items: center; gap: 12px; }
+  .cover-thumb { width: 52px; height: 52px; border-radius: 8px; object-fit: cover; border: 1px solid var(--line); flex: none; background: #eee; }
+  .cover-pick { font-size: 13px; color: var(--signal); font-weight: 600; cursor: pointer; }
+  .cover-pick:hover { text-decoration: underline; }
+  .opt-label { font-size: 11px; color: var(--ink-soft); font-weight: 500; text-transform: none; letter-spacing: 0; }
+
+  .freq-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+  .freq-opt {
+    padding: 11px 8px; border: 1px solid var(--line-strong); border-radius: 9px; background: #fdfcfa;
+    text-align: center; font-size: 13px; font-weight: 600; color: var(--ink-soft); transition: all .14s;
+  }
+  .freq-opt.active { border-color: var(--signal); background: var(--signal-dim); color: var(--signal); }
+  .freq-opt:hover:not(.active) { border-color: var(--ink-soft); }
+  .freq-row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .freq-row label { flex: 1; min-width: 130px; }
+  .freq-row label span { display: block; font-size: 11px; color: var(--ink-soft); margin-bottom: 5px; font-weight: 600; }
+  select.input { appearance: none; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M3 4.5L6 7.5L9 4.5' stroke='%234a525c' stroke-width='1.5' fill='none'/></svg>"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+
+  /* ---------- WHATSAPP PREVIEW ---------- */
+  .preview-wrap { position: sticky; top: 30px; }
+  .preview-label { font-family: var(--mono); font-size: 11px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 12px; text-align: center; }
+  .phone {
+    background: #0b141a; border-radius: 26px; padding: 10px; box-shadow: 0 18px 40px rgba(0,0,0,.22);
+  }
+  .phone-screen {
+    background: #0b141a url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cpath d='M0 20h40M20 0v40' stroke='%23ffffff08' stroke-width='1'/%3E%3C/svg%3E");
+    border-radius: 18px; padding: 16px 12px; min-height: 360px; display: flex; flex-direction: column; gap: 8px;
+  }
+  .wa-head { display: flex; align-items: center; gap: 9px; padding: 4px 4px 10px; border-bottom: 1px solid rgba(255,255,255,.07); margin-bottom: 6px; }
+  .wa-av { width: 30px; height: 30px; border-radius: 50%; background: var(--signal); display: grid; place-items: center; color: #fff; font-size: 13px; font-weight: 700; flex: none; }
+  .wa-name { color: #e9edef; font-size: 13.5px; font-weight: 600; }
+  .wa-status { color: #8696a0; font-size: 11px; }
+  .bubble {
+    background: #005c4b; color: #e9edef; border-radius: 8px; border-top-right-radius: 2px; padding: 7px 9px 5px;
+    max-width: 85%; align-self: flex-end; font-size: 13.5px; line-height: 1.4; box-shadow: 0 1px 1px rgba(0,0,0,.15);
+  }
+  .bubble .media {
+    border-radius: 6px; overflow: hidden; margin: -2px -3px 6px; background: #0b1a17; position: relative;
+  }
+  .bubble .media img { width: 100%; display: block; max-height: 180px; object-fit: cover; }
+  .bubble .media .filebox { padding: 16px; display: flex; align-items: center; gap: 10px; color: #cfd9de; }
+  .bubble .media .filebox .ic { font-size: 22px; }
+  .bubble .media .filebox .nm { font-size: 12.5px; font-weight: 600; word-break: break-word; }
+  .bubble .cap-text { white-space: pre-wrap; word-break: break-word; }
+  .bubble .ts { font-size: 10px; color: #8696a0; text-align: right; margin-top: 2px; }
+  .bubble.empty-b { background: rgba(255,255,255,.05); color: #5c6b73; align-self: center; text-align: center; font-size: 12.5px; border-radius: 8px; }
+  .build-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 6px; }
+
   @media (max-width: 760px) {
     .shell { grid-template-columns: 1fr; }
     .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; }
@@ -457,12 +532,223 @@ function val(id){ return document.getElementById(id).value.trim(); }
 function showModal(html){ const bg=document.createElement('div'); bg.className='modal-bg'; bg.id='modalBg'; bg.innerHTML=`<div class="modal">${html}</div>`; bg.onclick=(e)=>{ if(e.target===bg) closeModal(); }; document.body.appendChild(bg); }
 function closeModal(){ const m=document.getElementById('modalBg'); if(m) m.remove(); }
 
+// ---------- NEW INSTRUCTION (campaign builder) ----------
+let builder = null;
+async function renderInstruction(){
+  renderShell(`<div class="page-head"><div><div class="eyebrow">Create</div><h2>New Instruction</h2><p>Pick a file, write the message, choose who gets it and how often.</p></div></div><div id="buildArea"><div class="loading">Loading lists…</div></div>`);
+  // need lists for the dropdown
+  let lists = [];
+  try { const r = await api('/api/lists'); lists = r.lists; } catch(e){ document.getElementById('buildArea').innerHTML=`<div class="empty"><h3>Couldn't load lists</h3><p>${esc(e.message)}</p></div>`; return; }
+  if (!lists.length){
+    document.getElementById('buildArea').innerHTML = `<div class="empty"><h3>No broadcast lists yet</h3><p>Create a list of recipients first — then you can send instructions to it.</p><button class="btn" id="goLists">Go to Broadcast Lists</button></div>`;
+    document.getElementById('goLists').onclick=()=>{ state.page='lists'; route(); };
+    return;
+  }
+  builder = { source:'upload', file:null, fileUrl:null, fileKind:'document', cover:null, coverUrl:null, caption:'', name:'', listId:lists[0].id, interval:'daily', time:'09:00', everyDays:2, until:'' };
+  drawBuilder(lists);
+}
+
+function drawBuilder(lists){
+  const area = document.getElementById('buildArea');
+  area.innerHTML = `
+  <div class="builder">
+    <div class="build-col">
+      <div class="field-block">
+        <label class="cap">Message file</label>
+        <div class="src-tabs">
+          <button class="src-tab ${builder.source==='upload'?'active':''}" data-src="upload"><span class="si">📁</span>Upload from PC</button>
+          <button class="src-tab soon" data-src="drive"><span class="si">🅖</span>Google Drive <span class="soon-tag">soon</span></button>
+        </div>
+        <div id="srcBody"></div>
+      </div>
+
+      <div class="field-block">
+        <label class="cap">Message text <span class="opt-label">— sent with the file</span></label>
+        <textarea class="input" id="caption" placeholder="Type the message that goes out with this file…">${esc(builder.caption)}</textarea>
+      </div>
+
+      <div class="field-block">
+        <label class="cap">Cover image <span class="opt-label">— optional thumbnail shown on the file</span></label>
+        <div class="cover-row" id="coverRow"></div>
+        <input type="file" id="coverInput" accept="image/*" style="display:none"/>
+      </div>
+
+      <div class="field-block">
+        <label class="cap">Campaign name</label>
+        <input class="input" id="cname" placeholder="e.g. Daily Safety Reminder" value="${esc(builder.name)}"/>
+      </div>
+
+      <div class="field-block">
+        <label class="cap">Send to</label>
+        <select class="input" id="listSel">
+          ${lists.map(l=>`<option value="${l.id}" ${l.id===builder.listId?'selected':''}>${esc(l.name)} · ${l.contact_count} contacts</option>`).join('')}
+        </select>
+      </div>
+
+      <div class="field-block">
+        <label class="cap">Reminder schedule</label>
+        <div class="freq-grid">
+          ${['daily','weekly','monthly','custom'].map(f=>`<button class="freq-opt ${builder.interval===f?'active':''}" data-freq="${f}">${f[0].toUpperCase()+f.slice(1)}</button>`).join('')}
+        </div>
+        <div class="freq-row" id="freqRow"></div>
+      </div>
+
+      <div class="build-actions">
+        <button class="btn ghost" id="cancelBuild">Cancel</button>
+        <button class="btn" id="createBuild">Create & schedule</button>
+      </div>
+    </div>
+
+    <div class="preview-wrap">
+      <div class="preview-label">What recipients will see</div>
+      <div class="phone"><div class="phone-screen">
+        <div class="wa-head"><div class="wa-av">FM</div><div><div class="wa-name">Future Makers</div><div class="wa-status">business account</div></div></div>
+        <div id="bubble"></div>
+      </div></div>
+    </div>
+  </div>`;
+
+  drawSrcBody(); drawCoverRow(); drawFreqRow();
+  document.querySelectorAll('[data-src]').forEach(b=> b.onclick=()=>{ if(b.classList.contains('soon')){ toast('Google Drive connects in the next update','');return;} builder.source=b.dataset.src; drawBuilder(lists); });
+  document.querySelectorAll('[data-freq]').forEach(b=> b.onclick=()=>{ builder.interval=b.dataset.freq; drawBuilder(lists); });
+  document.getElementById('caption').oninput=(e)=>{ builder.caption=e.target.value; drawBubble(); };
+  document.getElementById('cname').oninput=(e)=>{ builder.name=e.target.value; };
+  document.getElementById('listSel').onchange=(e)=>{ builder.listId=e.target.value; };
+  document.getElementById('cancelBuild').onclick=()=>{ state.page='campaigns'; route(); };
+  document.getElementById('createBuild').onclick=()=>submitCampaign(lists);
+  drawBubble();
+}
+
+function drawSrcBody(){
+  const body=document.getElementById('srcBody');
+  if (builder.file){
+    body.innerHTML=`<div class="chosen"><span>📄</span><span>${esc(builder.file.name)}</span><span class="cx" id="clearFile">×</span></div>`;
+    document.getElementById('clearFile').onclick=()=>{ builder.file=null; builder.fileKind='document'; drawBuilder(window.__lists); };
+    return;
+  }
+  body.innerHTML=`<div class="filepick" id="fp"><div class="fi">⬆</div><p><b>Choose a file</b> or drag it here</p><p style="margin-top:4px;font-size:12px">image · video · audio · document</p></div><input type="file" id="fileInput" style="display:none"/>`;
+  const fp=document.getElementById('fp'), fi=document.getElementById('fileInput');
+  fp.onclick=()=>fi.click();
+  fi.onchange=()=>{ if(fi.files[0]){ builder.file=fi.files[0]; builder.fileKind=mimeKind(fi.files[0].type); drawSrcBody(); drawBubble(); } };
+  fp.ondragover=(e)=>{ e.preventDefault(); fp.classList.add('over'); };
+  fp.ondragleave=()=>fp.classList.remove('over');
+  fp.ondrop=(e)=>{ e.preventDefault(); fp.classList.remove('over'); if(e.dataTransfer.files[0]){ builder.file=e.dataTransfer.files[0]; builder.fileKind=mimeKind(builder.file.type); drawSrcBody(); drawBubble(); } };
+}
+function mimeKind(m){ if(!m) return 'document'; if(m.startsWith('image/'))return 'image'; if(m.startsWith('video/'))return 'video'; if(m.startsWith('audio/'))return 'audio'; return 'document'; }
+
+function drawCoverRow(){
+  const row=document.getElementById('coverRow');
+  if (builder.cover){
+    row.innerHTML=`<img class="cover-thumb" id="cthumb"/><div><div style="font-size:13px;font-weight:600">${esc(builder.cover.name)}</div><span class="cover-pick" id="removeCover">Remove</span></div>`;
+    const fr=new FileReader(); fr.onload=()=>{ const t=document.getElementById('cthumb'); if(t) t.src=fr.result; drawBubble(fr.result); }; fr.readAsDataURL(builder.cover);
+    document.getElementById('removeCover').onclick=()=>{ builder.cover=null; drawCoverRow(); drawBubble(); };
+  } else {
+    row.innerHTML=`<div class="cover-thumb" style="display:grid;place-items:center;color:var(--ink-soft)">🖼</div><span class="cover-pick" id="addCover">Add a cover image</span>`;
+    document.getElementById('addCover').onclick=()=>document.getElementById('coverInput').click();
+  }
+  document.getElementById('coverInput').onchange=(e)=>{ if(e.target.files[0]){ builder.cover=e.target.files[0]; drawCoverRow(); } };
+}
+
+function drawFreqRow(){
+  const row=document.getElementById('freqRow');
+  let html = `<label><span>Time of day</span><input class="input" type="time" id="ftime" value="${builder.time}"/></label>`;
+  if (builder.interval==='custom') html += `<label><span>Every (days)</span><input class="input" type="number" min="1" id="fdays" value="${builder.everyDays}"/></label>`;
+  if (builder.interval!=='once') html += `<label><span>End date <span style="font-weight:400;text-transform:none">(optional)</span></span><input class="input" type="date" id="funtil" value="${builder.until}"/></label>`;
+  row.innerHTML=html;
+  document.getElementById('ftime').onchange=(e)=>builder.time=e.target.value;
+  if(document.getElementById('fdays')) document.getElementById('fdays').onchange=(e)=>builder.everyDays=+e.target.value;
+  if(document.getElementById('funtil')) document.getElementById('funtil').onchange=(e)=>builder.until=e.target.value;
+}
+
+function drawBubble(coverDataUrl){
+  const b=document.getElementById('bubble'); if(!b) return;
+  const hasFile=!!builder.file, hasCap=builder.caption.trim().length>0;
+  if(!hasFile && !hasCap){ b.innerHTML=`<div class="bubble empty-b">Your message preview appears here</div>`; return; }
+  let media='';
+  if(hasFile){
+    if(builder.fileKind==='image' || coverDataUrl){
+      media=`<div class="media">${coverDataUrl?`<img src="${coverDataUrl}"/>`:`<div class="filebox"><span class="ic">🖼</span><span class="nm">${esc(builder.file.name)}</span></div>`}</div>`;
+    } else {
+      const ic = builder.fileKind==='video'?'🎬':builder.fileKind==='audio'?'🎵':'📄';
+      media=`<div class="media"><div class="filebox"><span class="ic">${ic}</span><span class="nm">${esc(builder.file.name)}</span></div></div>`;
+    }
+  }
+  const t=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+  b.innerHTML=`<div class="bubble">${media}${hasCap?`<div class="cap-text">${esc(builder.caption)}</div>`:''}<div class="ts">${t} ✓✓</div></div>`;
+}
+
+async function submitCampaign(lists){
+  if(!builder.name.trim()){ toast('Give the campaign a name','bad'); return; }
+  if(builder.source==='upload' && !builder.file){ toast('Choose a file to send','bad'); return; }
+  const freq = { interval: builder.interval, time: builder.time };
+  if(builder.interval==='custom') freq.everyDays=builder.everyDays;
+  if(builder.until) freq.until=builder.until;
+
+  const btn=document.getElementById('createBuild'); btn.disabled=true; btn.textContent='Creating…';
+  try {
+    const fd=new FormData();
+    fd.append('name', builder.name.trim());
+    fd.append('caption', builder.caption);
+    fd.append('broadcast_list_id', builder.listId);
+    fd.append('frequency', JSON.stringify(freq));
+    fd.append('file_source', builder.source);
+    if(builder.source==='upload' && builder.file){ fd.append('file', builder.file); fd.append('file_kind', builder.fileKind); }
+    if(builder.cover) fd.append('cover', builder.cover);
+    const t=await token();
+    const res=await fetch(API_BASE+'/api/campaigns',{method:'POST',headers:{Authorization:'Bearer '+t},body:fd});
+    const data=await res.json();
+    if(!res.ok) throw new Error(data.error||'Create failed');
+    toast('Campaign created & scheduled','good');
+    state.page='campaigns'; route();
+  } catch(e){ btn.disabled=false; btn.textContent='Create & schedule'; toast(e.message,'bad'); }
+}
+
+// ---------- CAMPAIGNS PAGE ----------
+async function renderCampaigns(){
+  renderShell(`<div class="page-head"><div><div class="eyebrow">Active</div><h2>Campaigns</h2><p>Running instructions and their schedules. Stop, pause, or restart any one.</p></div><button class="btn" id="newCamp">+ New instruction</button></div><div id="campArea"><div class="loading">Loading campaigns…</div></div>`);
+  document.getElementById('newCamp').onclick=()=>{ state.page='instruction'; route(); };
+  try {
+    const { campaigns } = await api('/api/campaigns');
+    const area=document.getElementById('campArea');
+    if(!campaigns.length){ area.innerHTML=`<div class="empty"><h3>No campaigns yet</h3><p>Create your first instruction and set how often it goes out.</p><button class="btn" id="nc2">+ New instruction</button></div>`; document.getElementById('nc2').onclick=()=>{ state.page='instruction'; route(); }; return; }
+    area.innerHTML=`<div class="panel"><table><thead><tr><th>Campaign</th><th>List</th><th>Schedule</th><th>Status</th><th>Next run</th><th></th></tr></thead><tbody>
+      ${campaigns.map(campRow).join('')}</tbody></table></div>`;
+    bindCampActions();
+  } catch(e){ document.getElementById('campArea').innerHTML=`<div class="empty"><h3>Couldn't load</h3><p>${esc(e.message)}</p></div>`; }
+}
+function freqLabel(f){ if(!f||f.interval==='once')return 'One-time'; if(f.interval==='custom')return 'Every '+(f.everyDays||'?')+' days'; const m={daily:'Daily',weekly:'Weekly',monthly:'Monthly'}; return (m[f.interval]||f.interval)+(f.time?' · '+f.time:''); }
+function statusPill(s){ const map={running:['opt-yes','Running'],paused:['opt-no','Paused'],draft:['opt-no','Draft'],completed:['opt-no','Done']}; const [cls,txt]=map[s]||['opt-no',s]; return `<span class="opt-pill ${cls}"><span class="opt-dot"></span>${txt}</span>`; }
+function campRow(c){
+  const list=c.broadcast_lists?.name||'—';
+  const next=c.next_run_at?new Date(c.next_run_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'—';
+  const canStop=c.status==='running', canStart=c.status==='paused'||c.status==='draft';
+  return `<tr>
+    <td><b>${esc(c.name)}</b>${c.caption?`<div style="font-size:12px;color:var(--ink-soft);margin-top:2px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.caption)}</div>`:''}</td>
+    <td>${esc(list)}</td>
+    <td class="phone-cell">${freqLabel(c.frequency)}</td>
+    <td>${statusPill(c.status)}</td>
+    <td class="phone-cell">${next}</td>
+    <td><div class="row-actions">
+      ${canStop?`<button class="btn sm danger" data-stop="${c.id}">Pause</button>`:''}
+      ${canStart?`<button class="btn sm ghost" data-start="${c.id}">Start</button>`:''}
+      <button class="icon-btn del" data-delcamp="${c.id}" title="Delete">🗑</button>
+    </div></td>
+  </tr>`;
+}
+function bindCampActions(){
+  document.querySelectorAll('[data-stop]').forEach(b=> b.onclick=()=>campStatus(b.dataset.stop,'paused'));
+  document.querySelectorAll('[data-start]').forEach(b=> b.onclick=()=>campStatus(b.dataset.start,'running'));
+  document.querySelectorAll('[data-delcamp]').forEach(b=> b.onclick=()=>campDelete(b.dataset.delcamp));
+}
+async function campStatus(id,status){ try{ await api(`/api/campaigns/${id}/status`,{method:'PATCH',json:{status}}); toast(status==='running'?'Campaign started':'Campaign paused','good'); renderCampaigns(); }catch(e){ toast(e.message,'bad'); } }
+async function campDelete(id){ try{ await api('/api/campaigns/'+id,{method:'DELETE'}); toast('Campaign deleted','good'); renderCampaigns(); }catch(e){ toast(e.message,'bad'); } }
+
 // ---------- ROUTER ----------
 function route(){
   switch(state.page){
     case 'lists': state.activeList?renderListDetail():renderLists(); break;
-    case 'instruction': placeholderPage('New Instruction','Pick a file, write the message, set a reminder schedule.'); break;
-    case 'campaigns': placeholderPage('Campaigns','See running campaigns and stop, pause, or restart them.'); break;
+    case 'instruction': renderInstruction(); break;
+    case 'campaigns': renderCampaigns(); break;
     case 'reports': placeholderPage('Campaign Reports','Delivery, read receipts, and replies per participant.'); break;
     default: renderLists();
   }
