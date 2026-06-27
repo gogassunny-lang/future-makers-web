@@ -544,7 +544,8 @@ async function renderInstruction(){
     document.getElementById('goLists').onclick=()=>{ state.page='lists'; route(); };
     return;
   }
-  builder = { source:'upload', file:null, fileUrl:null, fileKind:'document', cover:null, coverUrl:null, caption:'', name:'', listId:lists[0].id, interval:'daily', time:'09:00', everyDays:2, until:'' };
+  builder = { mode:'campaign', sendType:'now', schedAt:'', source:'upload', file:null, fileUrl:null, fileKind:'document', cover:null, coverUrl:null, caption:'', name:'', listId:lists[0].id, interval:'daily', time:'09:00', everyDays:2, until:'' };
+  window.__blists = lists;
   drawBuilder(lists);
 }
 
@@ -586,16 +587,17 @@ function drawBuilder(lists){
       </div>
 
       <div class="field-block">
-        <label class="cap">Reminder schedule</label>
-        <div class="freq-grid">
-          ${['daily','weekly','monthly','custom'].map(f=>`<button class="freq-opt ${builder.interval===f?'active':''}" data-freq="${f}">${f[0].toUpperCase()+f.slice(1)}</button>`).join('')}
+        <label class="cap">How should this go out?</label>
+        <div class="src-tabs" style="margin-bottom:16px">
+          <button class="src-tab ${builder.mode==='once'?'active':''}" data-mode="once"><span class="si">📤</span>Send once</button>
+          <button class="src-tab ${builder.mode==='campaign'?'active':''}" data-mode="campaign"><span class="si">🔁</span>Make a campaign</button>
         </div>
-        <div class="freq-row" id="freqRow"></div>
+        <div id="schedBody"></div>
       </div>
 
       <div class="build-actions">
         <button class="btn ghost" id="cancelBuild">Cancel</button>
-        <button class="btn" id="createBuild">Create & schedule</button>
+        <button class="btn" id="createBuild">${builder.mode==='once' && builder.sendType==='now' ? 'Send now' : 'Create & schedule'}</button>
       </div>
     </div>
 
@@ -608,9 +610,9 @@ function drawBuilder(lists){
     </div>
   </div>`;
 
-  drawSrcBody(); drawCoverRow(); drawFreqRow();
+  drawSrcBody(); drawCoverRow(); drawSchedBody();
   document.querySelectorAll('[data-src]').forEach(b=> b.onclick=()=>{ if(b.classList.contains('soon')){ toast('Google Drive connects in the next update','');return;} builder.source=b.dataset.src; drawBuilder(lists); });
-  document.querySelectorAll('[data-freq]').forEach(b=> b.onclick=()=>{ builder.interval=b.dataset.freq; drawBuilder(lists); });
+  document.querySelectorAll('[data-mode]').forEach(b=> b.onclick=()=>{ builder.mode=b.dataset.mode; drawBuilder(lists); });
   document.getElementById('caption').oninput=(e)=>{ builder.caption=e.target.value; drawBubble(); };
   document.getElementById('cname').oninput=(e)=>{ builder.name=e.target.value; };
   document.getElementById('listSel').onchange=(e)=>{ builder.listId=e.target.value; };
@@ -619,11 +621,36 @@ function drawBuilder(lists){
   drawBubble();
 }
 
+// Schedule body: differs for 'once' vs 'campaign'
+function drawSchedBody(){
+  const body=document.getElementById('schedBody'); if(!body) return;
+  if(builder.mode==='once'){
+    body.innerHTML=`
+      <div class="freq-grid" style="grid-template-columns:1fr 1fr">
+        <button class="freq-opt ${builder.sendType==='now'?'active':''}" data-st="now">Send now</button>
+        <button class="freq-opt ${builder.sendType==='schedule'?'active':''}" data-st="schedule">Schedule a time</button>
+      </div>
+      ${builder.sendType==='schedule'
+        ? `<div class="freq-row"><label style="flex:1"><span>Date &amp; time to send</span><input class="input" type="datetime-local" id="schedAt" value="${builder.schedAt}"/></label></div>`
+        : `<p style="font-size:12.5px;color:var(--ink-soft);padding:2px">Goes out to the list immediately after you confirm.</p>`}`;
+    body.querySelectorAll('[data-st]').forEach(b=> b.onclick=()=>{ builder.sendType=b.dataset.st; drawBuilder(window.__blists); });
+    const sa=document.getElementById('schedAt'); if(sa) sa.onchange=(e)=>builder.schedAt=e.target.value;
+  } else {
+    body.innerHTML=`
+      <div class="freq-grid">
+        ${['daily','weekly','monthly','custom'].map(f=>`<button class="freq-opt ${builder.interval===f?'active':''}" data-freq="${f}">${f[0].toUpperCase()+f.slice(1)}</button>`).join('')}
+      </div>
+      <div class="freq-row" id="freqRow"></div>`;
+    drawFreqRow();
+    body.querySelectorAll('[data-freq]').forEach(b=> b.onclick=()=>{ builder.interval=b.dataset.freq; drawBuilder(window.__blists); });
+  }
+}
+
 function drawSrcBody(){
   const body=document.getElementById('srcBody');
   if (builder.file){
     body.innerHTML=`<div class="chosen"><span>📄</span><span>${esc(builder.file.name)}</span><span class="cx" id="clearFile">×</span></div>`;
-    document.getElementById('clearFile').onclick=()=>{ builder.file=null; builder.fileKind='document'; drawBuilder(window.__lists); };
+    document.getElementById('clearFile').onclick=()=>{ builder.file=null; builder.fileKind='document'; drawBuilder(window.__blists); };
     return;
   }
   body.innerHTML=`<div class="filepick" id="fp"><div class="fi">⬆</div><p><b>Choose a file</b> or drag it here</p><p style="margin-top:4px;font-size:12px">image · video · audio · document</p></div><input type="file" id="fileInput" style="display:none"/>`;
@@ -680,11 +707,24 @@ function drawBubble(coverDataUrl){
 async function submitCampaign(lists){
   if(!builder.name.trim()){ toast('Give the campaign a name','bad'); return; }
   if(builder.source==='upload' && !builder.file){ toast('Choose a file to send','bad'); return; }
-  const freq = { interval: builder.interval, time: builder.time };
-  if(builder.interval==='custom') freq.everyDays=builder.everyDays;
-  if(builder.until) freq.until=builder.until;
 
-  const btn=document.getElementById('createBuild'); btn.disabled=true; btn.textContent='Creating…';
+  // Build the frequency object based on the chosen mode
+  let freq;
+  if(builder.mode==='once'){
+    if(builder.sendType==='schedule'){
+      if(!builder.schedAt){ toast('Pick a date and time','bad'); return; }
+      freq = { interval:'once', sendType:'schedule', at: new Date(builder.schedAt).toISOString() };
+    } else {
+      freq = { interval:'once', sendType:'now' };
+    }
+  } else {
+    freq = { interval: builder.interval, time: builder.time };
+    if(builder.interval==='custom') freq.everyDays=builder.everyDays;
+    if(builder.until) freq.until=builder.until;
+  }
+
+  const isNow = builder.mode==='once' && builder.sendType==='now';
+  const btn=document.getElementById('createBuild'); btn.disabled=true; btn.textContent=isNow?'Sending…':'Creating…';
   try {
     const fd=new FormData();
     fd.append('name', builder.name.trim());
@@ -698,9 +738,9 @@ async function submitCampaign(lists){
     const res=await fetch(API_BASE+'/api/campaigns',{method:'POST',headers:{Authorization:'Bearer '+t},body:fd});
     const data=await res.json();
     if(!res.ok) throw new Error(data.error||'Create failed');
-    toast('Campaign created & scheduled','good');
+    toast(isNow?'Sent (queued for delivery)':'Campaign created & scheduled','good');
     state.page='campaigns'; route();
-  } catch(e){ btn.disabled=false; btn.textContent='Create & schedule'; toast(e.message,'bad'); }
+  } catch(e){ btn.disabled=false; btn.textContent=isNow?'Send now':'Create & schedule'; toast(e.message,'bad'); }
 }
 
 // ---------- CAMPAIGNS PAGE ----------
@@ -716,7 +756,17 @@ async function renderCampaigns(){
     bindCampActions();
   } catch(e){ document.getElementById('campArea').innerHTML=`<div class="empty"><h3>Couldn't load</h3><p>${esc(e.message)}</p></div>`; }
 }
-function freqLabel(f){ if(!f||f.interval==='once')return 'One-time'; if(f.interval==='custom')return 'Every '+(f.everyDays||'?')+' days'; const m={daily:'Daily',weekly:'Weekly',monthly:'Monthly'}; return (m[f.interval]||f.interval)+(f.time?' · '+f.time:''); }
+function freqLabel(f){
+  if(!f) return 'One-time';
+  if(f.interval==='once'){
+    if(f.sendType==='now') return 'One-time · now';
+    if(f.sendType==='schedule' && f.at) return 'One-time · '+new Date(f.at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+    return 'One-time';
+  }
+  if(f.interval==='custom') return 'Every '+(f.everyDays||'?')+' days';
+  const m={daily:'Daily',weekly:'Weekly',monthly:'Monthly'};
+  return (m[f.interval]||f.interval)+(f.time?' · '+f.time:'');
+}
 function statusPill(s){ const map={running:['opt-yes','Running'],paused:['opt-no','Paused'],draft:['opt-no','Draft'],completed:['opt-no','Done']}; const [cls,txt]=map[s]||['opt-no',s]; return `<span class="opt-pill ${cls}"><span class="opt-dot"></span>${txt}</span>`; }
 function campRow(c){
   const list=c.broadcast_lists?.name||'—';
