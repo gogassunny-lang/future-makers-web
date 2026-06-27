@@ -37,52 +37,53 @@
   button { font-family: inherit; cursor: pointer; border: none; background: none; }
   input { font-family: inherit; }
 
-  /* ---------- LOGIN ---------- */
-  .login-wrap {
-    min-height: 100vh; display: grid; place-items: center; padding: 24px;
-    background:
-      radial-gradient(circle at 20% 10%, #fbf0e6 0, transparent 45%),
-      radial-gradient(circle at 85% 90%, #eef1ed 0, transparent 40%),
-      var(--paper);
+  /* ---------- LOGIN (split panel) ---------- */
+  .login-wrap { min-height: 100vh; display: grid; grid-template-columns: 1.05fr 1fr; }
+  .login-brandside {
+    background: var(--ink); color: #fff; padding: 56px 56px; position: relative; overflow: hidden;
+    display: flex; flex-direction: column;
   }
-  .login-card {
-    width: 100%; max-width: 380px; background: var(--panel);
-    border: 1px solid var(--line); border-radius: 14px; padding: 36px 32px;
-    box-shadow: var(--shadow);
+  .login-brandside::after {
+    content: ''; position: absolute; right: -120px; top: 50%; transform: translateY(-50%);
+    width: 460px; height: 460px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(214,90,30,.22) 0, transparent 62%);
   }
-  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
-  .brand-mark {
-    width: 34px; height: 34px; border-radius: 9px; background: var(--ink);
-    display: grid; place-items: center; position: relative; flex: none;
-  }
-  .brand-mark::before {
-    content: ''; width: 14px; height: 14px; border-radius: 50%;
-    border: 2.5px solid var(--signal); border-right-color: transparent; transform: rotate(-30deg);
-  }
-  .brand-name { font-weight: 700; letter-spacing: -.02em; font-size: 18px; }
-  .brand-name span { color: var(--signal); }
-  .login-card h1 { font-size: 21px; font-weight: 700; letter-spacing: -.02em; margin-bottom: 4px; }
-  .login-card .sub { color: var(--ink-soft); font-size: 13.5px; margin-bottom: 24px; }
+  .lb-logo { display: flex; align-items: center; gap: 11px; position: relative; z-index: 1; }
+  .lb-logo .nm { font-weight: 700; font-size: 19px; letter-spacing: -.02em; }
+  .lb-mid { margin-top: auto; margin-bottom: auto; position: relative; z-index: 1; }
+  .lb-eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--signal); margin-bottom: 18px; }
+  .lb-head { font-size: 38px; font-weight: 800; line-height: 1.08; letter-spacing: -.03em; margin-bottom: 18px; }
+  .lb-head .o { color: var(--signal); }
+  .lb-sub { font-size: 15px; color: #aeb6bf; max-width: 380px; line-height: 1.55; }
+  .lb-feats { margin-top: 30px; display: flex; flex-direction: column; gap: 12px; }
+  .lb-feat { display: flex; align-items: center; gap: 11px; font-size: 13.5px; color: #cdd3d9; }
+  .lb-feat .fk { width: 22px; height: 22px; border-radius: 6px; background: rgba(214,90,30,.18); color: var(--signal); display: grid; place-items: center; font-size: 12px; flex: none; }
+  .lb-foot { position: relative; z-index: 1; font-size: 12px; color: #6b747d; }
+
+  .login-formside { display: grid; place-items: center; padding: 40px; background: var(--paper); }
+  .login-card { width: 100%; max-width: 360px; }
+  .login-card .lc-logo { display: none; }
+  .login-card h1 { font-size: 25px; font-weight: 700; letter-spacing: -.02em; margin-bottom: 5px; }
+  .login-card .sub { color: var(--ink-soft); font-size: 14px; margin-bottom: 26px; }
   label.field { display: block; margin-bottom: 16px; }
-  label.field span {
-    display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .07em;
-    color: var(--ink-soft); margin-bottom: 6px; font-weight: 600;
-  }
-  .input {
-    width: 100%; padding: 11px 13px; border: 1px solid var(--line-strong);
-    border-radius: 9px; font-size: 14.5px; background: #fdfcfa; transition: border-color .15s, box-shadow .15s;
-  }
+  label.field span { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-soft); margin-bottom: 6px; font-weight: 600; }
+  .input { width: 100%; padding: 12px 13px; border: 1px solid var(--line-strong); border-radius: 9px; font-size: 14.5px; background: var(--panel); transition: border-color .15s, box-shadow .15s; }
   .input:focus { outline: none; border-color: var(--signal); box-shadow: 0 0 0 3px var(--signal-dim); }
-  .btn-primary {
-    width: 100%; padding: 12px; background: var(--ink); color: #fff; border-radius: 9px;
-    font-weight: 600; font-size: 14.5px; letter-spacing: -.01em; transition: transform .08s, background .15s;
-  }
+  .btn-primary { width: 100%; padding: 13px; background: var(--ink); color: #fff; border-radius: 9px; font-weight: 600; font-size: 14.5px; letter-spacing: -.01em; transition: transform .08s, background .15s; }
   .btn-primary:hover { background: #000; }
   .btn-primary:active { transform: translateY(1px); }
   .btn-primary:disabled { opacity: .55; cursor: not-allowed; }
   .err { color: var(--stop); font-size: 13px; margin-top: 12px; min-height: 18px; }
+  @media (max-width: 840px) {
+    .login-wrap { grid-template-columns: 1fr; }
+    .login-brandside { display: none; }
+    .login-card .lc-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; }
+    .login-card .lc-logo .nm { font-weight: 700; font-size: 18px; }
+  }
 
   /* ---------- APP SHELL ---------- */
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-name { font-weight: 700; letter-spacing: -.02em; font-size: 18px; }
   .shell { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
   .side {
     background: var(--ink); color: #cdd2d8; padding: 22px 16px;
@@ -295,6 +296,26 @@
   .bubble.empty-b { background: rgba(255,255,255,.05); color: #5c6b73; align-self: center; text-align: center; font-size: 12.5px; border-radius: 8px; }
   .build-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 6px; }
 
+  /* ---------- REPORTS ---------- */
+  .rep-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .rep-card { background: var(--panel); border: 1px solid var(--line); border-radius: 13px; padding: 18px; box-shadow: var(--shadow); cursor: pointer; transition: border-color .15s, transform .12s; }
+  .rep-card:hover { border-color: var(--line-strong); transform: translateY(-2px); }
+  .rep-card h3 { font-size: 16px; font-weight: 700; letter-spacing: -.02em; margin-bottom: 3px; }
+  .rep-card .rl { font-size: 12.5px; color: var(--ink-soft); margin-bottom: 14px; }
+  .rep-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+  .rep-stat { text-align: center; padding: 8px 4px; background: #fbfaf7; border-radius: 8px; }
+  .rep-stat b { display: block; font-family: var(--mono); font-size: 18px; font-weight: 500; }
+  .rep-stat span { font-size: 9.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-soft); }
+  .rep-stat.go b { color: var(--go); } .rep-stat.sig b { color: var(--signal); }
+  .metric-strip { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 22px; }
+  .metric { background: var(--ink); color: #fff; border-radius: 12px; padding: 16px 18px; }
+  .metric .mv { font-family: var(--mono); font-size: 26px; font-weight: 500; letter-spacing: -.02em; }
+  .metric .ml { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #9aa3ac; margin-top: 2px; }
+  .metric.go .mv { color: #5fd39a; } .metric.sig .mv { color: var(--signal); }
+  .reply-chip { display: inline-block; background: var(--signal-dim); color: var(--signal); font-size: 12px; padding: 3px 9px; border-radius: 14px; margin: 2px 3px 2px 0; }
+  .sim-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; padding: 14px 16px; background: #fdf6ec; border: 1px solid #f0dcc0; border-radius: 11px; align-items: center; }
+  .sim-bar .sl { font-size: 12px; font-weight: 600; color: #8a6d3b; margin-right: auto; }
+
   @media (max-width: 760px) {
     .shell { grid-template-columns: 1fr; }
     .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; }
@@ -314,7 +335,17 @@ const { API_BASE, SUPABASE_URL, SUPABASE_ANON_KEY } = window.FM_CONFIG;
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const root = document.getElementById('root');
 
-let state = { user: null, profile: null, page: 'lists', lists: [], activeList: null, contacts: [] };
+// FM logo mark (recolors via currentColor on the wrapper)
+const FM_MARK = (size=30, color='#D65A1E') => `<svg width="${size}" height="${Math.round(size*0.87)}" viewBox="0 0 124 108" xmlns="http://www.w3.org/2000/svg" style="display:block">
+  <g fill="${color}">
+    <path d="M16 24 h40 l-9 14 h-31 z"/><path d="M16 24 h14 v60 h-14 z"/>
+    <path d="M46 46 h14 v38 h-14 z"/><path d="M44 56 h34 v12 h-34 z"/><path d="M72 47 l22 15 l-22 15 z"/>
+  </g>
+  <g stroke="${color}" fill="none" stroke-width="7" stroke-linecap="round">
+    <path d="M96 36 a46 46 0 0 1 0 52"/><path d="M106 24 a62 62 0 0 1 0 76"/>
+  </g></svg>`;
+
+let state = { user: null, profile: null, page: 'lists', lists: [], activeList: null, activeReport: null, contacts: [] };
 
 // ---------- helpers ----------
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
@@ -333,15 +364,31 @@ async function api(path, opts={}){
 // ---------- AUTH ----------
 function renderLogin(errMsg){
   root.innerHTML = `
-  <div class="login-wrap"><div class="login-card">
-    <div class="brand"><div class="brand-mark"></div><div class="brand-name">Future<span>Makers</span></div></div>
-    <h1>Sign in</h1>
-    <p class="sub">Daily instructions, broadcast on schedule.</p>
-    <label class="field"><span>Email</span><input class="input" id="email" type="email" autocomplete="username" placeholder="you@company.com"/></label>
-    <label class="field"><span>Password</span><input class="input" id="password" type="password" autocomplete="current-password" placeholder="••••••••"/></label>
-    <button class="btn-primary" id="loginBtn">Sign in</button>
-    <div class="err" id="loginErr">${errMsg?esc(errMsg):''}</div>
-  </div></div>`;
+  <div class="login-wrap">
+    <div class="login-brandside">
+      <div class="lb-logo">${FM_MARK(30,'#fff')}<div class="nm">Future Makers</div></div>
+      <div class="lb-mid">
+        <div class="lb-eyebrow">Automate · Broadcast · Stay aligned</div>
+        <div class="lb-head">End manual reminders.<br><span class="o">Keep every team aligned.</span></div>
+        <div class="lb-sub">Drop a message and a file, pick who gets it, set how often — Future Makers sends it on WhatsApp automatically, and tracks who saw it.</div>
+        <div class="lb-feats">
+          <div class="lb-feat"><span class="fk">✓</span>Automated WhatsApp broadcasts on schedule</div>
+          <div class="lb-feat"><span class="fk">✓</span>Delivery, read &amp; reply tracking per person</div>
+          <div class="lb-feat"><span class="fk">✓</span>Excel contact upload &amp; broadcast groups</div>
+        </div>
+      </div>
+      <div class="lb-foot">Built for operations teams.</div>
+    </div>
+    <div class="login-formside"><div class="login-card">
+      <div class="lc-logo">${FM_MARK(28,'#D65A1E')}<div class="nm">Future Makers</div></div>
+      <h1>Sign in</h1>
+      <p class="sub">Welcome back. Enter your details to continue.</p>
+      <label class="field"><span>Email</span><input class="input" id="email" type="email" autocomplete="username" placeholder="you@company.com"/></label>
+      <label class="field"><span>Password</span><input class="input" id="password" type="password" autocomplete="current-password" placeholder="••••••••"/></label>
+      <button class="btn-primary" id="loginBtn">Sign in</button>
+      <div class="err" id="loginErr">${errMsg?esc(errMsg):''}</div>
+    </div></div>
+  </div>`;
   const btn = document.getElementById('loginBtn');
   const doLogin = async () => {
     const email = document.getElementById('email').value.trim();
@@ -363,7 +410,7 @@ function renderShell(inner){
   root.innerHTML = `
   <div class="shell">
     <aside class="side">
-      <div class="brand"><div class="brand-mark"></div><div class="brand-name">Future Makers</div></div>
+      <div class="brand">${FM_MARK(26,'#D65A1E')}<div class="brand-name" style="color:#fff">Future Makers</div></div>
       ${navItem('instruction','New Instruction')}
       ${navItem('campaigns','Campaigns')}
       ${navItem('lists','Broadcast Lists')}
@@ -375,7 +422,7 @@ function renderShell(inner){
     </aside>
     <main class="main">${inner}</main>
   </div>`;
-  document.querySelectorAll('[data-nav]').forEach(b=> b.onclick=()=>{ state.page=b.dataset.nav; state.activeList=null; route(); });
+  document.querySelectorAll('[data-nav]').forEach(b=> b.onclick=()=>{ state.page=b.dataset.nav; state.activeList=null; state.activeReport=null; route(); });
   document.getElementById('signout').onclick = async ()=>{ await sb.auth.signOut(); state.user=null; renderLogin(); };
 }
 
@@ -793,13 +840,74 @@ function bindCampActions(){
 async function campStatus(id,status){ try{ await api(`/api/campaigns/${id}/status`,{method:'PATCH',json:{status}}); toast(status==='running'?'Campaign started':'Campaign paused','good'); renderCampaigns(); }catch(e){ toast(e.message,'bad'); } }
 async function campDelete(id){ try{ await api('/api/campaigns/'+id,{method:'DELETE'}); toast('Campaign deleted','good'); renderCampaigns(); }catch(e){ toast(e.message,'bad'); } }
 
+// ---------- CAMPAIGN REPORTS ----------
+async function renderReports(){
+  if (state.activeReport){ renderReportDetail(); return; }
+  renderShell(`<div class="page-head"><div><div class="eyebrow">Analytics</div><h2>Campaign Reports</h2><p>Who received, read, and replied to each campaign.</p></div></div><div id="repArea"><div class="loading">Loading reports…</div></div>`);
+  try {
+    const { reports } = await api('/api/reports');
+    const withSends = reports.filter(r=>r.total_sends>0);
+    const area=document.getElementById('repArea');
+    if(!withSends.length){ area.innerHTML=`<div class="empty"><h3>No sends yet</h3><p>Once a campaign fires, its delivery and reply analytics show up here.</p></div>`; return; }
+    area.innerHTML=`<div class="rep-grid">${withSends.map(r=>`
+      <div class="rep-card" data-rep="${r.id}">
+        <h3>${esc(r.name)}</h3><div class="rl">${esc(r.list_name)}</div>
+        <div class="rep-stats">
+          <div class="rep-stat"><b>${r.total_sends}</b><span>Sent</span></div>
+          <div class="rep-stat go"><b>${r.delivered}</b><span>Deliv.</span></div>
+          <div class="rep-stat go"><b>${r.read}</b><span>Read</span></div>
+          <div class="rep-stat sig"><b>${r.replies}</b><span>Replies</span></div>
+        </div>
+      </div>`).join('')}</div>`;
+    document.querySelectorAll('[data-rep]').forEach(c=> c.onclick=()=>{ state.activeReport=c.dataset.rep; renderReportDetail(); });
+  } catch(e){ document.getElementById('repArea').innerHTML=`<div class="empty"><h3>Couldn't load</h3><p>${esc(e.message)}</p></div>`; }
+}
+
+async function renderReportDetail(){
+  renderShell(`<a class="back-link" id="back">← All reports</a><div id="repDetail"><div class="loading">Loading…</div></div>`);
+  document.getElementById('back').onclick=()=>{ state.activeReport=null; renderReports(); };
+  try {
+    const { campaign, participants } = await api('/api/reports/'+state.activeReport);
+    const tot=participants.reduce((a,p)=>a+p.sent,0);
+    const deliv=participants.reduce((a,p)=>a+p.delivered,0);
+    const read=participants.reduce((a,p)=>a+p.read,0);
+    const repl=participants.reduce((a,p)=>a+p.replies.length,0);
+    const isSuper = (state.profile?.role==='super_admin' || state.profile?.role==='admin');
+    document.getElementById('repDetail').innerHTML=`
+      <div class="page-head"><div><div class="eyebrow">${esc(campaign.broadcast_lists?.name||'')}</div><h2>${esc(campaign.name)}</h2>${campaign.caption?`<p>${esc(campaign.caption)}</p>`:''}</div></div>
+      <div class="metric-strip">
+        <div class="metric"><div class="mv">${tot}</div><div class="ml">Total sent</div></div>
+        <div class="metric go"><div class="mv">${deliv}</div><div class="ml">Delivered</div></div>
+        <div class="metric go"><div class="mv">${read}</div><div class="ml">Read</div></div>
+        <div class="metric sig"><div class="mv">${repl}</div><div class="ml">Replies</div></div>
+      </div>
+      ${isSuper?`<div class="sim-bar"><span class="sl">Demo simulator — fake employee behaviour (mock mode)</span>
+        <button class="btn sm ghost" id="simReadAll">Mark all read</button>
+        <button class="btn sm" id="simReply">Add a sample reply</button></div>`:''}
+      <div class="panel"><table><thead><tr><th>Name</th><th>Phone</th><th>Status</th><th>Last sent</th><th>Replies</th></tr></thead><tbody>
+      ${participants.map(partRow).join('')}</tbody></table></div>`;
+    if(isSuper){
+      document.getElementById('simReadAll').onclick=async ()=>{ try{ await api(`/api/sim/${state.activeReport}/read-all`,{method:'POST',json:{}}); toast('Marked all as read','good'); renderReportDetail(); }catch(e){ toast(e.message,'bad'); } };
+      document.getElementById('simReply').onclick=async ()=>{ const p=participants[0]; if(!p){toast('No participants','bad');return;} try{ await api(`/api/sim/${state.activeReport}/reply`,{method:'POST',json:{contact_id:p.contact_id, body:'Acknowledged 👍'}}); toast('Sample reply added','good'); renderReportDetail(); }catch(e){ toast(e.message,'bad'); } };
+    }
+  } catch(e){ document.getElementById('repDetail').innerHTML=`<div class="empty"><h3>Couldn't load</h3><p>${esc(e.message)}</p></div>`; }
+}
+function partRow(p){
+  const status = p.read>0?`<span class="opt-pill opt-yes"><span class="opt-dot"></span>Read</span>`
+    : p.delivered>0?`<span class="opt-pill" style="color:var(--ink-soft)"><span class="opt-dot"></span>Delivered</span>`
+    : `<span class="opt-pill opt-no"><span class="opt-dot"></span>Sent</span>`;
+  const last=p.last_sent?new Date(p.last_sent).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'—';
+  const replies=p.replies.length?p.replies.map(r=>`<span class="reply-chip">${esc(r.body)}</span>`).join(''):'<span style="color:var(--ink-soft)">—</span>';
+  return `<tr><td><b>${esc(p.name||'—')}</b>${p.department?`<div style="font-size:11px;color:var(--ink-soft)">${esc(p.department)}</div>`:''}</td><td class="phone-cell">${esc(p.phone)}</td><td>${status}</td><td class="phone-cell">${last}</td><td>${replies}</td></tr>`;
+}
+
 // ---------- ROUTER ----------
 function route(){
   switch(state.page){
     case 'lists': state.activeList?renderListDetail():renderLists(); break;
     case 'instruction': renderInstruction(); break;
     case 'campaigns': renderCampaigns(); break;
-    case 'reports': placeholderPage('Campaign Reports','Delivery, read receipts, and replies per participant.'); break;
+    case 'reports': renderReports(); break;
     default: renderLists();
   }
 }
