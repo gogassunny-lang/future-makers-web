@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Future Makers</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<style>
+  :root {
+    --ink: #14181d;
+    --ink-soft: #4a525c;
+    --paper: #f6f4ef;
+    --panel: #ffffff;
+    --line: #e2ddd2;
+    --line-strong: #cfc8b8;
+    --signal: #d65a1e;       /* dispatch orange */
+    --signal-dim: #f0e3d8;
+    --go: #1f7a4d;           /* live green */
+    --go-dim: #e2f0e8;
+    --stop: #b13636;
+    --stop-dim: #f4e2e0;
+    --shadow: 0 1px 2px rgba(20,24,29,.06), 0 8px 24px rgba(20,24,29,.05);
+    --mono: 'DM Mono', 'SF Mono', ui-monospace, 'Cascadia Code', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Inter', -apple-system, system-ui, sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.45;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+
+  button { font-family: inherit; cursor: pointer; border: none; background: none; }
+  input { font-family: inherit; }
+
+  /* ---------- LOGIN ---------- */
+  .login-wrap {
+    min-height: 100vh; display: grid; place-items: center; padding: 24px;
+    background:
+      radial-gradient(circle at 20% 10%, #fbf0e6 0, transparent 45%),
+      radial-gradient(circle at 85% 90%, #eef1ed 0, transparent 40%),
+      var(--paper);
+  }
+  .login-card {
+    width: 100%; max-width: 380px; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 14px; padding: 36px 32px;
+    box-shadow: var(--shadow);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
+  .brand-mark {
+    width: 34px; height: 34px; border-radius: 9px; background: var(--ink);
+    display: grid; place-items: center; position: relative; flex: none;
+  }
+  .brand-mark::before {
+    content: ''; width: 14px; height: 14px; border-radius: 50%;
+    border: 2.5px solid var(--signal); border-right-color: transparent; transform: rotate(-30deg);
+  }
+  .brand-name { font-weight: 700; letter-spacing: -.02em; font-size: 18px; }
+  .brand-name span { color: var(--signal); }
+  .login-card h1 { font-size: 21px; font-weight: 700; letter-spacing: -.02em; margin-bottom: 4px; }
+  .login-card .sub { color: var(--ink-soft); font-size: 13.5px; margin-bottom: 24px; }
+  label.field { display: block; margin-bottom: 16px; }
+  label.field span {
+    display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .07em;
+    color: var(--ink-soft); margin-bottom: 6px; font-weight: 600;
+  }
+  .input {
+    width: 100%; padding: 11px 13px; border: 1px solid var(--line-strong);
+    border-radius: 9px; font-size: 14.5px; background: #fdfcfa; transition: border-color .15s, box-shadow .15s;
+  }
+  .input:focus { outline: none; border-color: var(--signal); box-shadow: 0 0 0 3px var(--signal-dim); }
+  .btn-primary {
+    width: 100%; padding: 12px; background: var(--ink); color: #fff; border-radius: 9px;
+    font-weight: 600; font-size: 14.5px; letter-spacing: -.01em; transition: transform .08s, background .15s;
+  }
+  .btn-primary:hover { background: #000; }
+  .btn-primary:active { transform: translateY(1px); }
+  .btn-primary:disabled { opacity: .55; cursor: not-allowed; }
+  .err { color: var(--stop); font-size: 13px; margin-top: 12px; min-height: 18px; }
+
+  /* ---------- APP SHELL ---------- */
+  .shell { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
+  .side {
+    background: var(--ink); color: #cdd2d8; padding: 22px 16px;
+    display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100vh;
+  }
+  .side .brand { margin-bottom: 30px; }
+  .side .brand-name { color: #fff; }
+  .nav-item {
+    display: flex; align-items: center; gap: 11px; padding: 10px 12px; border-radius: 9px;
+    color: #aab2bb; font-size: 14px; font-weight: 500; width: 100%; text-align: left; transition: background .14s, color .14s;
+  }
+  .nav-item:hover { background: rgba(255,255,255,.06); color: #e8ebee; }
+  .nav-item.active { background: var(--signal); color: #fff; }
+  .nav-item .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .6; flex: none; }
+  .nav-item.active .dot { opacity: 1; }
+  .side-foot { margin-top: auto; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.08); }
+  .who { font-size: 12.5px; color: #9aa3ac; }
+  .who b { color: #e8ebee; font-weight: 600; display: block; font-size: 13.5px; }
+  .role-tag {
+    display: inline-block; margin-top: 6px; font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+    padding: 2px 7px; border-radius: 5px; background: rgba(255,255,255,.1); color: #cdd2d8; font-weight: 600;
+  }
+  .signout { margin-top: 12px; font-size: 12.5px; color: #9aa3ac; }
+  .signout:hover { color: var(--signal); }
+
+  .main { padding: 30px 38px; max-width: 1100px; }
+  .page-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; gap: 16px; }
+  .page-head h2 { font-size: 24px; font-weight: 700; letter-spacing: -.025em; }
+  .page-head p { color: var(--ink-soft); font-size: 14px; margin-top: 3px; }
+  .eyebrow { font-family: var(--mono); font-size: 11px; color: var(--signal); letter-spacing: .04em; text-transform: uppercase; margin-bottom: 6px; }
+
+  .btn {
+    padding: 10px 16px; border-radius: 9px; font-weight: 600; font-size: 13.5px;
+    background: var(--ink); color: #fff; display: inline-flex; align-items: center; gap: 7px; transition: background .14s, transform .08s;
+  }
+  .btn:hover { background: #000; }
+  .btn:active { transform: translateY(1px); }
+  .btn.ghost { background: var(--panel); color: var(--ink); border: 1px solid var(--line-strong); }
+  .btn.ghost:hover { background: #fbfaf7; border-color: var(--ink-soft); }
+  .btn.danger { background: var(--stop-dim); color: var(--stop); }
+  .btn.danger:hover { background: #efd6d3; }
+  .btn.sm { padding: 6px 11px; font-size: 12.5px; }
+
+  /* ---------- LIST CARDS ---------- */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 13px; padding: 18px 18px 16px;
+    box-shadow: var(--shadow); transition: border-color .15s, transform .12s; cursor: pointer; position: relative;
+  }
+  .card:hover { border-color: var(--line-strong); transform: translateY(-2px); }
+  .card h3 { font-size: 16px; font-weight: 700; letter-spacing: -.02em; margin-bottom: 4px; padding-right: 20px; }
+  .card .meta { font-family: var(--mono); font-size: 12px; color: var(--ink-soft); }
+  .count-badge {
+    display: inline-flex; align-items: baseline; gap: 5px; margin-top: 14px;
+    font-family: var(--mono);
+  }
+  .count-badge b { font-size: 26px; font-weight: 500; letter-spacing: -.02em; color: var(--ink); }
+  .count-badge span { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  .card-x {
+    position: absolute; top: 14px; right: 12px; width: 26px; height: 26px; border-radius: 7px;
+    color: var(--ink-soft); display: grid; place-items: center; font-size: 17px; line-height: 1;
+  }
+  .card-x:hover { background: var(--stop-dim); color: var(--stop); }
+
+  .empty {
+    border: 1.5px dashed var(--line-strong); border-radius: 13px; padding: 48px 24px; text-align: center;
+    color: var(--ink-soft); background: #fdfcfa;
+  }
+  .empty h3 { color: var(--ink); font-size: 17px; margin-bottom: 6px; font-weight: 700; }
+  .empty p { font-size: 14px; margin-bottom: 18px; }
+
+  /* ---------- TABLE ---------- */
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 13px; box-shadow: var(--shadow); overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-soft);
+    font-weight: 600; padding: 13px 16px; border-bottom: 1px solid var(--line); background: #fbfaf7;
+  }
+  td { padding: 12px 16px; border-bottom: 1px solid var(--line); font-size: 14px; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: #fcfbf8; }
+  .phone-cell { font-family: var(--mono); font-size: 13px; color: var(--ink-soft); }
+  .code-cell { font-family: var(--mono); font-size: 12.5px; color: var(--ink-soft); }
+  .dept-pill {
+    display: inline-block; font-size: 11px; padding: 2px 9px; border-radius: 20px;
+    background: var(--signal-dim); color: var(--signal); font-weight: 600; letter-spacing: .02em;
+  }
+  .opt-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; }
+  .opt-yes { color: var(--go); }
+  .opt-no { color: var(--ink-soft); }
+  .opt-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .row-actions { display: flex; gap: 6px; justify-content: flex-end; }
+  .icon-btn { width: 28px; height: 28px; border-radius: 7px; display: grid; place-items: center; color: var(--ink-soft); font-size: 14px; }
+  .icon-btn:hover { background: var(--signal-dim); color: var(--signal); }
+  .icon-btn.del:hover { background: var(--stop-dim); color: var(--stop); }
+
+  /* ---------- MODAL ---------- */
+  .modal-bg {
+    position: fixed; inset: 0; background: rgba(20,24,29,.4); backdrop-filter: blur(2px);
+    display: grid; place-items: center; padding: 20px; z-index: 50;
+  }
+  .modal {
+    background: var(--panel); border-radius: 15px; width: 100%; max-width: 440px; padding: 26px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.25); max-height: 90vh; overflow-y: auto;
+  }
+  .modal h3 { font-size: 19px; font-weight: 700; letter-spacing: -.02em; margin-bottom: 4px; }
+  .modal .msub { color: var(--ink-soft); font-size: 13.5px; margin-bottom: 20px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 22px; }
+  .modal-actions .btn { flex: 1; justify-content: center; }
+  .drop {
+    border: 1.5px dashed var(--line-strong); border-radius: 11px; padding: 26px 18px; text-align: center;
+    background: #fdfcfa; transition: border-color .15s, background .15s; cursor: pointer;
+  }
+  .drop:hover, .drop.over { border-color: var(--signal); background: var(--signal-dim); }
+  .drop .di { font-size: 26px; margin-bottom: 8px; }
+  .drop p { font-size: 13.5px; color: var(--ink-soft); }
+  .drop b { color: var(--signal); }
+  .filename { font-family: var(--mono); font-size: 13px; color: var(--ink); margin-top: 10px; }
+
+  .toast {
+    position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+    background: var(--ink); color: #fff; padding: 12px 20px; border-radius: 10px; font-size: 13.5px; font-weight: 500;
+    box-shadow: 0 10px 30px rgba(0,0,0,.25); z-index: 60; max-width: 90vw;
+  }
+  .toast.bad { background: var(--stop); }
+  .toast.good { background: var(--go); }
+
+  .skipnote {
+    margin-top: 14px; padding: 12px 14px; background: #fdf6ec; border: 1px solid #f0dcc0; border-radius: 9px;
+    font-size: 12.5px; color: #8a6d3b;
+  }
+  .skipnote b { color: var(--signal); }
+
+  .loading { text-align: center; padding: 40px; color: var(--ink-soft); font-size: 14px; }
+  .back-link { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-soft); font-size: 13px; font-weight: 500; margin-bottom: 14px; }
+  .back-link:hover { color: var(--signal); }
+
+  @media (max-width: 760px) {
+    .shell { grid-template-columns: 1fr; }
+    .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; }
+    .side .brand { margin-bottom: 0; margin-right: auto; }
+    .side-foot { margin-top: 0; border: none; padding-top: 0; width: 100%; display: flex; justify-content: space-between; align-items: center; }
+    .nav-item { width: auto; }
+    .main { padding: 22px 18px; }
+    .page-head { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+<div id="root"><div class="loading">Loading…</div></div>
+
+<script>
+const { API_BASE, SUPABASE_URL, SUPABASE_ANON_KEY } = window.FM_CONFIG;
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const root = document.getElementById('root');
+
+let state = { user: null, profile: null, page: 'lists', lists: [], activeList: null, contacts: [] };
+
+// ---------- helpers ----------
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function toast(msg, kind){ const t=document.createElement('div'); t.className='toast '+(kind||''); t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(), 3200); }
+async function token(){ const { data } = await sb.auth.getSession(); return data.session?.access_token; }
+async function api(path, opts={}){
+  const t = await token();
+  const headers = { Authorization: 'Bearer '+t, ...(opts.headers||{}) };
+  if (opts.json){ headers['Content-Type']='application/json'; opts.body=JSON.stringify(opts.json); delete opts.json; }
+  const res = await fetch(API_BASE+path, { ...opts, headers });
+  const data = await res.json().catch(()=>({}));
+  if (!res.ok) throw new Error(data.error || ('Request failed ('+res.status+')'));
+  return data;
+}
+
+// ---------- AUTH ----------
+function renderLogin(errMsg){
+  root.innerHTML = `
+  <div class="login-wrap"><div class="login-card">
+    <div class="brand"><div class="brand-mark"></div><div class="brand-name">Future<span>Makers</span></div></div>
+    <h1>Sign in</h1>
+    <p class="sub">Daily instructions, broadcast on schedule.</p>
+    <label class="field"><span>Email</span><input class="input" id="email" type="email" autocomplete="username" placeholder="you@company.com"/></label>
+    <label class="field"><span>Password</span><input class="input" id="password" type="password" autocomplete="current-password" placeholder="••••••••"/></label>
+    <button class="btn-primary" id="loginBtn">Sign in</button>
+    <div class="err" id="loginErr">${errMsg?esc(errMsg):''}</div>
+  </div></div>`;
+  const btn = document.getElementById('loginBtn');
+  const doLogin = async () => {
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    if(!email||!password){ document.getElementById('loginErr').textContent='Enter email and password.'; return; }
+    btn.disabled = true; btn.textContent='Signing in…';
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error){ btn.disabled=false; btn.textContent='Sign in'; document.getElementById('loginErr').textContent=error.message; return; }
+    boot();
+  };
+  btn.onclick = doLogin;
+  document.getElementById('password').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+}
+
+// ---------- SHELL ----------
+function navItem(id, label){ return `<button class="nav-item ${state.page===id?'active':''}" data-nav="${id}"><span class="dot"></span>${label}</button>`; }
+function renderShell(inner){
+  const p = state.profile || {};
+  root.innerHTML = `
+  <div class="shell">
+    <aside class="side">
+      <div class="brand"><div class="brand-mark"></div><div class="brand-name">Future Makers</div></div>
+      ${navItem('instruction','New Instruction')}
+      ${navItem('campaigns','Campaigns')}
+      ${navItem('lists','Broadcast Lists')}
+      ${navItem('reports','Campaign Reports')}
+      <div class="side-foot">
+        <div class="who"><b>${esc(p.name||p.email||'User')}</b>${esc(p.email||'')}<br/><span class="role-tag">${esc((p.role||'user').replace('_',' '))}</span></div>
+        <button class="signout" id="signout">Sign out</button>
+      </div>
+    </aside>
+    <main class="main">${inner}</main>
+  </div>`;
+  document.querySelectorAll('[data-nav]').forEach(b=> b.onclick=()=>{ state.page=b.dataset.nav; state.activeList=null; route(); });
+  document.getElementById('signout').onclick = async ()=>{ await sb.auth.signOut(); state.user=null; renderLogin(); };
+}
+
+function placeholderPage(title, desc){
+  renderShell(`<div class="page-head"><div><div class="eyebrow">Coming in a later phase</div><h2>${title}</h2><p>${desc}</p></div></div>
+  <div class="empty"><h3>Not built yet</h3><p>This page will be wired up in an upcoming phase.</p></div>`);
+}
+
+// ---------- LISTS PAGE ----------
+async function renderLists(){
+  renderShell(`<div class="page-head">
+    <div><div class="eyebrow">Recipients</div><h2>Broadcast Lists</h2><p>Upload a contact sheet to create a list. Lists feed your campaigns.</p></div>
+    <button class="btn" id="newList">+ New list from Excel</button>
+  </div><div id="listArea"><div class="loading">Loading lists…</div></div>`);
+  document.getElementById('newList').onclick = openUploadModal;
+  try {
+    const { lists } = await api('/api/lists');
+    state.lists = lists;
+    const area = document.getElementById('listArea');
+    if (!lists.length){
+      area.innerHTML = `<div class="empty"><h3>No lists yet</h3><p>Upload an Excel of contacts to create your first broadcast list.</p><button class="btn" id="newList2">+ New list from Excel</button></div>`;
+      document.getElementById('newList2').onclick = openUploadModal;
+      return;
+    }
+    area.innerHTML = `<div class="grid">${lists.map(l=>`
+      <div class="card" data-list="${l.id}">
+        <button class="card-x" data-del="${l.id}" data-name="${esc(l.name)}" title="Delete list">×</button>
+        <h3>${esc(l.name)}</h3>
+        <div class="meta">Created ${new Date(l.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</div>
+        <div class="count-badge"><b>${l.contact_count}</b><span>contacts</span></div>
+      </div>`).join('')}</div>`;
+    document.querySelectorAll('[data-list]').forEach(c=> c.onclick=(e)=>{ if(e.target.dataset.del) return; openList(c.dataset.list); });
+    document.querySelectorAll('[data-del]').forEach(b=> b.onclick=(e)=>{ e.stopPropagation(); confirmDeleteList(b.dataset.del, b.dataset.name); });
+  } catch(err){ document.getElementById('listArea').innerHTML = `<div class="empty"><h3>Couldn't load</h3><p>${esc(err.message)}</p></div>`; }
+}
+
+function confirmDeleteList(id, name){
+  showModal(`<h3>Delete list?</h3><p class="msub">“${esc(name)}” and all its contacts will be permanently removed. This can't be undone.</p>
+  <div class="modal-actions"><button class="btn ghost" id="mc">Cancel</button><button class="btn danger" id="mok">Delete list</button></div>`);
+  document.getElementById('mc').onclick = closeModal;
+  document.getElementById('mok').onclick = async ()=>{ try{ await api('/api/lists/'+id,{method:'DELETE'}); closeModal(); toast('List deleted','good'); renderLists(); }catch(e){ toast(e.message,'bad'); } };
+}
+
+// ---------- UPLOAD MODAL ----------
+function openUploadModal(){
+  let file = null;
+  showModal(`<h3>New broadcast list</h3><p class="msub">Name the list and upload an Excel/CSV of contacts. 10-digit numbers are converted to +91 automatically.</p>
+    <label class="field"><span>List name</span><input class="input" id="lname" placeholder="e.g. ALDS Field Team"/></label>
+    <div class="drop" id="drop"><div class="di">⬆</div><p><b>Choose a file</b> or drag it here</p><p style="margin-top:4px;font-size:12px">.xlsx, .xls or .csv</p><div class="filename" id="fname"></div></div>
+    <input type="file" id="file" accept=".xlsx,.xls,.csv" style="display:none"/>
+    <div class="err" id="upErr"></div>
+    <div class="modal-actions"><button class="btn ghost" id="mc">Cancel</button><button class="btn" id="mok">Create list</button></div>`);
+  const drop=document.getElementById('drop'), fileInput=document.getElementById('file'), fname=document.getElementById('fname');
+  drop.onclick=()=>fileInput.click();
+  fileInput.onchange=()=>{ if(fileInput.files[0]){ file=fileInput.files[0]; fname.textContent='📄 '+file.name; } };
+  drop.ondragover=(e)=>{ e.preventDefault(); drop.classList.add('over'); };
+  drop.ondragleave=()=>drop.classList.remove('over');
+  drop.ondrop=(e)=>{ e.preventDefault(); drop.classList.remove('over'); if(e.dataTransfer.files[0]){ file=e.dataTransfer.files[0]; fname.textContent='📄 '+file.name; } };
+  document.getElementById('mc').onclick=closeModal;
+  document.getElementById('mok').onclick=async ()=>{
+    const name=document.getElementById('lname').value.trim();
+    const errEl=document.getElementById('upErr');
+    if(!name){ errEl.textContent='Give the list a name.'; return; }
+    if(!file){ errEl.textContent='Choose a file to upload.'; return; }
+    const btn=document.getElementById('mok'); btn.disabled=true; btn.textContent='Uploading…';
+    try {
+      const fd=new FormData(); fd.append('name',name); fd.append('file',file);
+      const t=await token();
+      const res=await fetch(API_BASE+'/api/lists/upload',{method:'POST',headers:{Authorization:'Bearer '+t},body:fd});
+      const data=await res.json();
+      if(!res.ok) throw new Error(data.error||'Upload failed');
+      closeModal();
+      let msg='Imported '+data.imported+' contacts';
+      if(data.skipped&&data.skipped.length) msg+=' · '+data.skipped.length+' skipped';
+      toast(msg,'good');
+      renderLists();
+    } catch(e){ btn.disabled=false; btn.textContent='Create list'; errEl.textContent=e.message; }
+  };
+}
+
+// ---------- LIST DETAIL ----------
+async function openList(id){
+  state.page='lists';
+  renderShell(`<a class="back-link" id="back">← All lists</a><div id="detail"><div class="loading">Loading contacts…</div></div>`);
+  document.getElementById('back').onclick=()=>{ state.activeList=null; renderLists(); };
+  try {
+    const { list, contacts } = await api('/api/lists/'+id);
+    state.activeList=list; state.contacts=contacts;
+    renderListDetail();
+  } catch(e){ document.getElementById('detail').innerHTML=`<div class="empty"><h3>Couldn't load</h3><p>${esc(e.message)}</p></div>`; }
+}
+
+function renderListDetail(){
+  const l=state.activeList, cs=state.contacts;
+  const detail=document.getElementById('detail');
+  detail.innerHTML = `
+  <div class="page-head">
+    <div><div class="eyebrow">${cs.length} contact${cs.length===1?'':'s'}</div><h2>${esc(l.name)}</h2><p>Add or edit people without re-uploading the whole sheet.</p></div>
+    <button class="btn" id="addContact">+ Add person</button>
+  </div>
+  <div class="panel"><table><thead><tr>
+    <th>Code</th><th>Name</th><th>Phone</th><th>Department</th><th>Opt-in</th><th></th>
+  </tr></thead><tbody id="rows">
+  ${cs.length? cs.map(rowHtml).join('') : `<tr><td colspan="6" style="text-align:center;color:var(--ink-soft);padding:30px">No contacts in this list yet.</td></tr>`}
+  </tbody></table></div>`;
+  document.getElementById('addContact').onclick=()=>openContactModal(null);
+  bindRowActions();
+}
+function rowHtml(c){
+  return `<tr data-row="${c.id}">
+    <td class="code-cell">${esc(c.code||'—')}</td>
+    <td>${esc(c.name||'—')}</td>
+    <td class="phone-cell">${esc(c.phone)}</td>
+    <td>${c.department?`<span class="dept-pill">${esc(c.department)}</span>`:'—'}</td>
+    <td><span class="opt-pill ${c.opted_in?'opt-yes':'opt-no'}"><span class="opt-dot"></span>${c.opted_in?'Yes':'No'}</span></td>
+    <td><div class="row-actions"><button class="icon-btn" data-edit="${c.id}" title="Edit">✎</button><button class="icon-btn del" data-delc="${c.id}" title="Remove">🗑</button></div></td>
+  </tr>`;
+}
+function bindRowActions(){
+  document.querySelectorAll('[data-edit]').forEach(b=> b.onclick=()=>openContactModal(state.contacts.find(c=>c.id===b.dataset.edit)));
+  document.querySelectorAll('[data-delc]').forEach(b=> b.onclick=()=>deleteContact(b.dataset.delc));
+}
+function openContactModal(contact){
+  const isEdit=!!contact;
+  showModal(`<h3>${isEdit?'Edit contact':'Add person'}</h3><p class="msub">${isEdit?'Update this contact’s details.':'Add a single person to “'+esc(state.activeList.name)+'”.'}</p>
+    <label class="field"><span>Name</span><input class="input" id="c_name" value="${isEdit?esc(contact.name):''}" placeholder="Full name"/></label>
+    <label class="field"><span>Phone (10 digits)</span><input class="input" id="c_phone" value="${isEdit?esc(contact.phone):''}" placeholder="9876543210"/></label>
+    <label class="field"><span>Unique code</span><input class="input" id="c_code" value="${isEdit?esc(contact.code):''}" placeholder="e.g. AA44"/></label>
+    <label class="field"><span>Department</span><input class="input" id="c_dept" value="${isEdit?esc(contact.department):''}" placeholder="e.g. ALDS"/></label>
+    <div class="err" id="cErr"></div>
+    <div class="modal-actions"><button class="btn ghost" id="mc">Cancel</button><button class="btn" id="mok">${isEdit?'Save changes':'Add person'}</button></div>`);
+  document.getElementById('mc').onclick=closeModal;
+  document.getElementById('mok').onclick=async ()=>{
+    const body={ name:val('c_name'), phone:val('c_phone'), code:val('c_code'), department:val('c_dept') };
+    const errEl=document.getElementById('cErr');
+    if(!body.phone){ errEl.textContent='Phone is required.'; return; }
+    const btn=document.getElementById('mok'); btn.disabled=true; btn.textContent='Saving…';
+    try {
+      if(isEdit) await api(`/api/lists/${state.activeList.id}/contacts/${contact.id}`,{method:'PATCH',json:body});
+      else await api(`/api/lists/${state.activeList.id}/contacts`,{method:'POST',json:body});
+      closeModal(); toast(isEdit?'Contact updated':'Person added','good');
+      openList(state.activeList.id);
+    } catch(e){ btn.disabled=false; btn.textContent=isEdit?'Save changes':'Add person'; errEl.textContent=e.message; }
+  };
+}
+async function deleteContact(id){
+  try { await api(`/api/lists/${state.activeList.id}/contacts/${id}`,{method:'DELETE'});
+    state.contacts=state.contacts.filter(c=>c.id!==id); renderListDetail(); toast('Contact removed','good');
+  } catch(e){ toast(e.message,'bad'); }
+}
+function val(id){ return document.getElementById(id).value.trim(); }
+
+// ---------- MODAL primitives ----------
+function showModal(html){ const bg=document.createElement('div'); bg.className='modal-bg'; bg.id='modalBg'; bg.innerHTML=`<div class="modal">${html}</div>`; bg.onclick=(e)=>{ if(e.target===bg) closeModal(); }; document.body.appendChild(bg); }
+function closeModal(){ const m=document.getElementById('modalBg'); if(m) m.remove(); }
+
+// ---------- ROUTER ----------
+function route(){
+  switch(state.page){
+    case 'lists': state.activeList?renderListDetail():renderLists(); break;
+    case 'instruction': placeholderPage('New Instruction','Pick a file, write the message, set a reminder schedule.'); break;
+    case 'campaigns': placeholderPage('Campaigns','See running campaigns and stop, pause, or restart them.'); break;
+    case 'reports': placeholderPage('Campaign Reports','Delivery, read receipts, and replies per participant.'); break;
+    default: renderLists();
+  }
+}
+
+// ---------- BOOT ----------
+async function boot(){
+  let session = null;
+  try {
+    const result = await Promise.race([
+      sb.auth.getSession(),
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')), 6000)),
+    ]);
+    session = result?.data?.session || null;
+  } catch { session = null; }
+
+  if(!session){ renderLogin(); return; }
+  state.user = session.user;
+  try {
+    const { data: prof } = await sb.from('users').select('*').eq('id', state.user.id).single();
+    state.profile = prof || { email: state.user.email, role: 'user', name: '' };
+  } catch { state.profile = { email: state.user.email, role: 'user', name: '' }; }
+  state.page='lists'; route();
+}
+boot();
+</script>
+</body>
+</html>
