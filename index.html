@@ -130,6 +130,9 @@
     display: inline-block; margin-top: 6px; font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
     padding: 2px 7px; border-radius: 5px; background: rgba(255,255,255,.1); color: #cdd2d8; font-weight: 600;
   }
+  .who-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+  .gear-btn { width: 30px; height: 30px; border-radius: 8px; color: #9aa3ac; font-size: 16px; display: grid; place-items: center; flex: none; transition: background .14s, color .14s; }
+  .gear-btn:hover { background: rgba(255,255,255,.08); color: #fff; }
   .signout { margin-top: 12px; font-size: 12.5px; color: #9aa3ac; }
   .signout:hover { color: var(--signal); }
 
@@ -452,7 +455,10 @@ function renderShell(inner){
       ${navItem('lists','Broadcast Lists')}
       ${navItem('reports','Campaign Reports')}
       <div class="side-foot">
-        <div class="who"><b>${esc(p.name||p.email||'User')}</b>${esc(p.email||'')}<br/><span class="role-tag">${esc((p.role||'user').replace('_',' '))}</span></div>
+        <div class="who-row">
+          <div class="who"><b>${esc(p.name||p.email||'User')}</b>${esc(p.email||'')}<br/><span class="role-tag">${esc((p.role||'user').replace('_',' '))}</span></div>
+          <button class="gear-btn" id="editProfile" title="Edit profile">⚙</button>
+        </div>
         <button class="signout" id="signout">Sign out</button>
       </div>
     </aside>
@@ -460,6 +466,7 @@ function renderShell(inner){
   </div>`;
   document.querySelectorAll('[data-nav]').forEach(b=> b.onclick=()=>{ state.page=b.dataset.nav; state.activeList=null; state.activeReport=null; route(); });
   document.getElementById('signout').onclick = async ()=>{ await sb.auth.signOut(); state.user=null; renderLogin(); };
+  document.getElementById('editProfile').onclick = openProfileModal;
 }
 
 function placeholderPage(title, desc){
@@ -935,6 +942,29 @@ function partRow(p){
   const last=p.last_sent?new Date(p.last_sent).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'—';
   const replies=p.replies.length?p.replies.map(r=>`<span class="reply-chip">${esc(r.body)}</span>`).join(''):'<span style="color:var(--ink-soft)">—</span>';
   return `<tr><td><b>${esc(p.name||'—')}</b>${p.department?`<div style="font-size:11px;color:var(--ink-soft)">${esc(p.department)}</div>`:''}</td><td class="phone-cell">${esc(p.phone)}</td><td>${status}</td><td class="phone-cell">${last}</td><td>${replies}</td></tr>`;
+}
+
+// ---------- PROFILE ----------
+function openProfileModal(){
+  const p = state.profile || {};
+  showModal(`<h3>Edit profile</h3><p class="msub">Update your display name. This is what shows in the app.</p>
+    <label class="field"><span>Display name</span><input class="input" id="pf_name" value="${esc(p.name||'')}" placeholder="Your name"/></label>
+    <label class="field"><span>Email <span style="font-weight:400;text-transform:none">(can't be changed)</span></span><input class="input" value="${esc(p.email||'')}" disabled style="opacity:.6"/></label>
+    <div class="err" id="pfErr"></div>
+    <div class="modal-actions"><button class="btn ghost" id="mc">Cancel</button><button class="btn" id="mok">Save</button></div>`);
+  document.getElementById('mc').onclick = closeModal;
+  document.getElementById('mok').onclick = async ()=>{
+    const name = document.getElementById('pf_name').value.trim();
+    const errEl = document.getElementById('pfErr');
+    if(!name){ errEl.textContent='Name cannot be empty.'; return; }
+    const btn=document.getElementById('mok'); btn.disabled=true; btn.textContent='Saving…';
+    try {
+      const { profile } = await api('/api/profile/me', { method:'PATCH', json:{ name } });
+      state.profile = profile;
+      closeModal(); toast('Profile updated','good');
+      route(); // re-render so sidebar name updates
+    } catch(e){ btn.disabled=false; btn.textContent='Save'; errEl.textContent=e.message; }
+  };
 }
 
 // ---------- ROUTER ----------
