@@ -130,8 +130,10 @@
     display: inline-block; margin-top: 6px; font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
     padding: 2px 7px; border-radius: 5px; background: rgba(255,255,255,.1); color: #cdd2d8; font-weight: 600;
   }
-  .who-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-  .gear-btn { width: 30px; height: 30px; border-radius: 8px; color: #9aa3ac; font-size: 16px; display: grid; place-items: center; flex: none; transition: background .14s, color .14s; }
+  .who-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; }
+  .who-row .who { min-width: 0; flex: 1; overflow: hidden; }
+  .who-row .who b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gear-btn { width: 30px; height: 30px; border-radius: 8px; color: #9aa3ac; font-size: 15px; display: grid; place-items: center; flex: none; transition: background .14s, color .14s; }
   .gear-btn:hover { background: rgba(255,255,255,.08); color: #fff; }
   .signout { margin-top: 12px; font-size: 12.5px; color: #9aa3ac; }
   .signout:hover { color: var(--signal); }
