@@ -140,7 +140,7 @@ td{padding:8px;border-top:1px solid var(--line);vertical-align:middle}
     <input id="lg-pass" class="lg-inp" type="password" autocomplete="current-password" placeholder="Your password" onkeydown="if(event.key==='Enter')doLogin()"/>
     <button class="lg-btn" onclick="doLogin()">Sign in</button>
     <div id="lg-err" class="lg-err"></div>
-    <div style="text-align:center;color:#9aa0a8;font-size:11px;margin-top:18px">Build D2.3</div>
+    <div style="text-align:center;color:#9aa0a8;font-size:11px;margin-top:18px">Build D3</div>
   </div>
 </div>
 
@@ -225,7 +225,7 @@ function renderTabs(){
   const tabs = [
     { id:'home', ic:'🏠', t:'Home' },
     { id:'chat', ic:'💬', t:'Chat' },
-    { id:'broadcast', ic:'📣', t:'Broadcast', soon:true },
+    { id:'broadcast', ic:'📣', t:'Broadcast' },
     { id:'tasks', ic:'✅', t:'Tasks', soon:true },
     ...(isAdmin() ? [{ id:'admin', ic:'🛠', t:'Admin' }] : []),
     { id:'profile', ic:'👤', t:'Me' },
@@ -234,7 +234,7 @@ function renderTabs(){
     `<button class="tab ${S.page===x.id?'on':''}" onclick="${x.soon?`toast('${x.t} arrives in the next stage')`:`go('${x.id}')`}">
       <span class="ic">${x.ic}</span>${x.t}</button>`).join('');
 }
-function go(p){ S.page=p; renderTabs(); ({home:renderHome, admin:renderAdmin, profile:renderProfile, chat:renderChat}[p]||renderHome)(); }
+function go(p){ S.page=p; renderTabs(); ({home:renderHome, admin:renderAdmin, profile:renderProfile, chat:renderChat, broadcast:renderBroadcast}[p]||renderHome)(); }
 
 // ---------------- HOME ----------------
 function renderHome(){
@@ -244,7 +244,7 @@ function renderHome(){
     <div class="h1">Hello, ${esc(S.profile.name.split(' ')[0])} 👋</div>
     <div class="grid2">
       ${f.chat_direct||f.chat_groups ? `<div class="tile" onclick="go('chat')" style="cursor:pointer"><div class="ic">💬</div><div class="t">Chat</div><div class="s">Messages · groups · media</div></div>`:''}
-      ${tile('📣', f.broadcast_create?'Broadcasts':'Announcements', 'Coming in Stage D3',1)}
+      <div class="tile" onclick="go('broadcast')" style="cursor:pointer"><div class="ic">📣</div><div class="t">${f.broadcast_create?'Broadcasts':'Announcements'}</div><div class="s">Instructions · schedule · tracking</div></div>
       ${f.tasks_view ? tile('✅','Tasks','Full WatchOwl · Stage D4',1):''}
       ${f.meetings_join ? tile('📅','Meetings','Meet + AI minutes · Stage D5',1):''}
       ${isAdmin() ? `<div class="tile" onclick="go('admin')" style="cursor:pointer;border-color:var(--signal)"><div class="ic">🛠</div><div class="t">Admin</div><div class="s">Users · Departments · Access</div></div>`:''}
@@ -469,7 +469,7 @@ function renderProfile(){
       <div class="row" style="margin-top:12px"><button class="btn p" onclick="changePass()">Update password</button></div>
     </div>
     <div class="card"><button class="btn danger" style="width:100%" onclick="doLogout()">Sign out</button></div>
-    <div style="text-align:center;color:var(--muted);font-size:11px;margin-top:8px">Future Makers v2 · Build D2.3</div>`;
+    <div style="text-align:center;color:var(--muted);font-size:11px;margin-top:8px">Future Makers v2 · Build D3</div>`;
 }
 async function changePass(){
   try {
@@ -811,6 +811,12 @@ function wireMic(){
 function ensureRealtime(){
   if(S.chat.sub) return; S.chat.sub = true;
   sb.channel('fm-chat')
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'fm_broadcast_receipts'}, payload => {
+      if(payload.new?.user_id===S.profile.id){
+        toast('📣 New broadcast received');
+        if(S.page==='broadcast' && S.bc.view==='inbox') paintInbox();
+      }
+    })
     .on('postgres_changes',{event:'DELETE',schema:'public',table:'fm_messages'}, payload => {
       const id = payload.old?.id; if(!id) return;
       const had = S.chat.msgs.find(x=>x.id===id);
@@ -828,6 +834,218 @@ function ensureRealtime(){
       }
     })
     .subscribe();
+}
+
+// ================= BROADCASTS (Stage D3) =================
+S.bc = { view:'inbox', inbox:[], manage:[], atts:[] };
+
+async function renderBroadcast(){
+  const canCreate = S.features.broadcast_create===true;
+  if(!canCreate) S.bc.view='inbox';
+  document.getElementById('main').innerHTML = `
+    <div class="h1">📣 Broadcasts</div>
+    ${canCreate?`<div class="row" style="margin-bottom:12px">
+      <button class="btn ${S.bc.view==='inbox'?'g':''}" onclick="S.bc.view='inbox';renderBroadcast()">Inbox</button>
+      <button class="btn ${S.bc.view==='manage'?'g':''}" onclick="S.bc.view='manage';renderBroadcast()">Manage</button>
+      <button class="btn p" style="margin-left:auto" onclick="openComposer()">+ New broadcast</button>
+    </div>`:''}
+    <div id="bc-body"><div class="card">Loading…</div></div>`;
+  if(S.bc.view==='inbox') await paintInbox(); else await paintManage();
+}
+
+async function paintInbox(){
+  try { const j = await api('/api/fm/broadcasts/inbox'); S.bc.inbox = j.inbox||[]; }
+  catch(e){ document.getElementById('bc-body').innerHTML = `<div class="card">⚠ ${esc(e.message)}</div>`; return; }
+  const el = document.getElementById('bc-body'); if(!el) return;
+  el.innerHTML = S.bc.inbox.length ? S.bc.inbox.map(r=>{
+    const b = r.fm_broadcasts||{};
+    const media = Array.isArray(b.media)?b.media:[];
+    return `<div class="card" style="${r.read_at?'':'border-left:4px solid var(--signal)'}">
+      <div class="row" style="justify-content:space-between;align-items:flex-start">
+        <div><b style="font-size:15px">${esc(b.title||'')}</b>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:2px">
+            From ${esc(b.fm_users?.name||'—')} · to ${esc(b.target_label||'All')} · ${tfmt(r.delivered_at)}
+            ${r.emailed_at?' · 📧 emailed':''}</div></div>
+        ${!r.read_at?`<span class="cl-badge">NEW</span>`:''}
+      </div>
+      ${b.body?`<div style="font-size:14px;line-height:1.55;margin-top:8px;white-space:pre-wrap">${esc(b.body)}</div>`:''}
+      ${media.length?`<div class="row" style="margin-top:8px">${media.map(m=>`
+        <button class="btn sm" onclick="openBcMedia('${esc(m.path)}')">${m.kind==='image'?'🖼':m.kind==='video'?'🎥':'📄'} ${esc(m.name||m.kind)}</button>`).join('')}</div>`:''}
+      <div class="row" style="margin-top:10px">
+        ${!r.read_at?`<button class="btn sm" onclick="markRead('${r.id}')">Mark read</button>`:`<span class="pill on">Read</span>`}
+        ${b.ack_required?(r.ack_at?`<span class="pill on">✔ Acknowledged</span>`:`<button class="btn sm p" onclick="ackReceipt('${r.id}')">✔ Acknowledge</button>`):''}
+      </div>
+    </div>`;
+  }).join('') : `<div class="card" style="text-align:center;color:var(--muted)">No broadcasts yet.</div>`;
+  // opening the tab counts as delivered-seen; auto-read stays manual (Mark read / Ack)
+}
+async function markRead(id){ try{ await api('/api/fm/broadcasts/receipts/'+id+'/read',{method:'POST'}); paintInbox(); }catch(e){ toast('⚠ '+e.message);} }
+async function ackReceipt(id){ try{ await api('/api/fm/broadcasts/receipts/'+id+'/ack',{method:'POST'}); toast('Acknowledged ✔'); paintInbox(); }catch(e){ toast('⚠ '+e.message);} }
+async function openBcMedia(path){
+  try { const j = await api('/api/fm/broadcasts/media?path='+encodeURIComponent(path)); if(j.url) window.open(j.url,'_blank'); }
+  catch(e){ toast('⚠ '+e.message); }
+}
+
+async function paintManage(){
+  try { const j = await api('/api/fm/broadcasts/manage'); S.bc.manage = j.broadcasts||[]; }
+  catch(e){ document.getElementById('bc-body').innerHTML = `<div class="card">⚠ ${esc(e.message)}</div>`; return; }
+  const el = document.getElementById('bc-body'); if(!el) return;
+  const chip = st => ({draft:'#889',scheduled:'#1a56b0',running:'#1F7A4D',done:'#667',paused:'#B13636'}[st]||'#889');
+  el.innerHTML = S.bc.manage.length ? S.bc.manage.map(b=>`
+    <div class="card">
+      <div class="row" style="justify-content:space-between;align-items:flex-start">
+        <div><b>${esc(b.title)}</b>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:2px">
+            to ${esc(b.target_label||'All')} · ${b.send_mode}${b.next_run_at?' · next '+tfmt(b.next_run_at):''}
+            ${b.channels?.email?' · 📧':''}${b.ack_required?' · ✔ ack':''}</div></div>
+        <span class="pill" style="background:${chip(b.status)}22;color:${chip(b.status)}">${b.status}</span>
+      </div>
+      <div style="font-size:12.5px;color:var(--muted);margin-top:6px">
+        Delivered <b>${b.counts.delivered}</b> · Read <b>${b.counts.read}</b> · Ack <b>${b.counts.ack}</b></div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn sm" onclick="openReport('${b.id}')">📊 Report</button>
+        <button class="btn sm" onclick="fireNow('${b.id}')">🚀 Send now</button>
+        ${b.send_mode!=='now'&&b.status!=='done'?(b.status==='paused'
+          ?`<button class="btn sm" onclick="bcAct('${b.id}','resume')">▶ Resume</button>`
+          :`<button class="btn sm" onclick="bcAct('${b.id}','pause')">⏸ Pause</button>`):''}
+        <button class="btn sm danger" onclick="delBroadcast('${b.id}')">🗑 Delete</button>
+      </div>
+    </div>`).join('') : `<div class="card" style="text-align:center;color:var(--muted)">No broadcasts created yet — hit “+ New broadcast”.</div>`;
+}
+async function fireNow(id){ try{ const r=await api('/api/fm/broadcasts/'+id+'/fire',{method:'POST'}); toast('Sent to '+r.recipients+' people'); paintManage(); }catch(e){ toast('⚠ '+e.message);} }
+async function bcAct(id,a){ try{ await api('/api/fm/broadcasts/'+id+'/'+a,{method:'POST'}); paintManage(); }catch(e){ toast('⚠ '+e.message);} }
+async function delBroadcast(id){ if(!confirm('Delete this broadcast and all its tracking data?'))return;
+  try{ await api('/api/fm/broadcasts/'+id,{method:'DELETE'}); toast('Deleted'); paintManage(); }catch(e){ toast('⚠ '+e.message);} }
+
+// ----- composer -----
+async function openComposer(){
+  S.bc.atts=[];
+  await loadDirectory();
+  let depts=[]; try{ const j=await api('/api/fm/departments'); depts=j.departments||[]; }catch{}
+  let groups=[]; try{ const j=await api('/api/fm/chat/conversations'); groups=(j.conversations||[]).filter(c=>c.kind==='group'); }catch{}
+  modal(`
+    <div class="m-h"><b>New broadcast</b><button class="m-x" onclick="closeModal()">×</button></div>
+    <label class="lbl">Title</label><input id="bc-title" class="inp" placeholder="e.g. Safety instruction — today"/>
+    <label class="lbl">Message</label><textarea id="bc-body" class="inp" style="min-height:90px" placeholder="Write the instruction…"></textarea>
+    <label class="lbl">Attachments</label>
+    <div id="bc-atts" class="row"></div>
+    <div class="row" style="margin-top:4px">
+      <button class="btn sm" onclick="bcPick('image')">🖼 Image</button>
+      ${S.features.media_video?`<button class="btn sm" onclick="bcPick('video')">🎥 Video</button>`:''}
+      <button class="btn sm" onclick="bcPick('document')">📄 File</button>
+      <input type="file" id="bc-file" class="hide"/>
+    </div>
+    <label class="lbl">Audience</label>
+    <select id="bc-target" class="inp" onchange="bcTargetUI()">
+      <option value="all">🌐 All employees</option>
+      ${depts.map(d=>`<option value="department:${d.id}:${esc(d.name)}">🏢 Department — ${esc(d.name)}</option>`).join('')}
+      ${groups.map(g=>`<option value="group:${g.id}:${esc(g.title)}">👥 Group — ${esc(g.title)}</option>`).join('')}
+    </select>
+    <div class="row" style="margin-top:10px">
+      ${S.features.broadcast_email?`<label class="chk" style="border:none"><input type="checkbox" id="bc-email"/> 📧 Also send by Email (Brevo)</label>`:''}
+      <label class="chk" style="border:none"><input type="checkbox" id="bc-ack"/> ✔ Require Acknowledge</label>
+    </div>
+    <label class="lbl">When</label>
+    <select id="bc-mode" class="inp" onchange="bcModeUI()">
+      <option value="now">🚀 Send now</option>
+      <option value="schedule">🗓 Schedule once</option>
+      <option value="recur">🔁 Recurring</option>
+    </select>
+    <div id="bc-when" style="margin-top:8px"></div>
+    <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn p" onclick="createBroadcast()">Create</button></div>`);
+  bcModeUI();
+}
+function bcModeUI(){
+  const m = document.getElementById('bc-mode').value;
+  const el = document.getElementById('bc-when');
+  if(m==='now'){ el.innerHTML=''; return; }
+  if(m==='schedule'){ el.innerHTML = `<input id="bc-at" type="datetime-local" class="inp"/>`; return; }
+  el.innerHTML = `
+    <div class="row">
+      <select id="bc-freq" class="inp" style="flex:1">
+        <option value="daily">Daily</option><option value="weekly">Weekly</option>
+        <option value="monthly">Monthly</option><option value="custom">Every N days</option>
+      </select>
+      <input id="bc-int" class="inp" style="width:90px" inputmode="numeric" placeholder="N" value="2"/>
+      <input id="bc-time" type="time" class="inp" style="width:130px" value="09:00"/>
+    </div>
+    <label class="lbl">End date (optional)</label><input id="bc-end" type="date" class="inp"/>`;
+}
+function bcTargetUI(){}
+function bcPick(kind){
+  const f = document.getElementById('bc-file');
+  f.accept = kind==='image'?'image/*':kind==='video'?'video/*':'*/*';
+  f.onchange = async () => {
+    const file = f.files[0]; if(!file) return;
+    toast('Uploading '+file.name+'…');
+    try {
+      let data, ct=file.type||'application/octet-stream';
+      if(kind==='image'){ data = await compressImage(file); ct='image/jpeg'; }
+      else data = await fileToB64(file);
+      const up = await api('/api/fm/broadcasts/media',{method:'POST',body:{kind,name:file.name,data,content_type:ct}});
+      S.bc.atts.push({path:up.path,name:file.name,kind,size:up.size});
+      document.getElementById('bc-atts').innerHTML = S.bc.atts.map((a,i)=>
+        `<span class="btn sm">${a.kind==='image'?'🖼':a.kind==='video'?'🎥':'📄'} ${esc(a.name)} <b style="cursor:pointer" onclick="S.bc.atts.splice(${i},1);bcPick.refresh()">×</b></span>`).join('');
+      toast('Attached ✔');
+    } catch(e){ toast('⚠ '+e.message); }
+  };
+  f.value=''; f.click();
+}
+bcPick.refresh = () => { const el=document.getElementById('bc-atts'); if(el) el.innerHTML = S.bc.atts.map((a,i)=>
+  `<span class="btn sm">${a.kind==='image'?'🖼':a.kind==='video'?'🎥':'📄'} ${esc(a.name)} <b style="cursor:pointer" onclick="S.bc.atts.splice(${i},1);bcPick.refresh()">×</b></span>`).join(''); };
+
+async function createBroadcast(){
+  const t = document.getElementById('bc-title').value.trim();
+  if(!t){ toast('Give it a title'); return; }
+  const tgt = document.getElementById('bc-target').value;
+  let target_type='all', target_id=null, target_label='All employees';
+  if(tgt!=='all'){ const [ty,id,...rest]=tgt.split(':'); target_type=ty; target_id=id; target_label=rest.join(':'); }
+  const mode = document.getElementById('bc-mode').value;
+  const body = {
+    title:t, body:document.getElementById('bc-body').value.trim()||null,
+    media:S.bc.atts, target_type, target_id, target_label,
+    channels:{ inapp:true, email: document.getElementById('bc-email')?.checked===true },
+    ack_required: document.getElementById('bc-ack').checked,
+    send_mode: mode,
+  };
+  if(mode==='schedule'){
+    const at = document.getElementById('bc-at').value;
+    if(!at){ toast('Pick date & time'); return; }
+    body.next_run_at = new Date(at).toISOString();
+  }
+  if(mode==='recur'){
+    body.recur = { freq:document.getElementById('bc-freq').value,
+      interval_days:Number(document.getElementById('bc-int').value)||1,
+      time:document.getElementById('bc-time').value||'09:00',
+      end_date:document.getElementById('bc-end').value||null };
+  }
+  try {
+    const r = await api('/api/fm/broadcasts',{method:'POST',body});
+    toast(mode==='now' ? ('Sent to '+(r.fired?.recipients??0)+' people 🚀') : 'Broadcast scheduled ✔');
+    closeModal(); S.bc.view='manage'; renderBroadcast();
+  } catch(e){ toast('⚠ '+e.message); }
+}
+
+// ----- report modal -----
+async function openReport(id){
+  let j; try { j = await api('/api/fm/broadcasts/'+id+'/report'); } catch(e){ toast('⚠ '+e.message); return; }
+  const rec = j.receipts||[];
+  const n = { d:rec.length, r:rec.filter(x=>x.read_at).length, a:rec.filter(x=>x.ack_at).length,
+              e:rec.filter(x=>x.emailed_at).length, o:rec.filter(x=>x.email_opened_at).length };
+  const tick = v => v?'<span style="color:var(--go);font-weight:800">✓</span>':'<span style="color:#ccc">—</span>';
+  modal(`
+    <div class="m-h"><b>📊 ${esc(j.broadcast.title)}</b><button class="m-x" onclick="closeModal()">×</button></div>
+    <div class="row" style="gap:14px;font-size:13px;margin-bottom:10px">
+      <span>Delivered <b>${n.d}</b></span><span>Read <b>${n.r}</b></span><span>Ack <b>${n.a}</b></span>
+      ${n.e?`<span>Emailed <b>${n.e}</b></span><span>Opened <b>${n.o}</b></span>`:''}
+    </div>
+    <div style="overflow-x:auto;max-height:52vh;overflow-y:auto">
+    <table><thead><tr><th>Employee</th><th>Dept</th><th>Read</th><th>Ack</th><th>Email</th><th>Opened</th></tr></thead>
+    <tbody>${rec.map(r=>`
+      <tr><td><b>${esc(r.fm_users?.name||'')}</b> <span style="color:var(--muted);font-size:11px">${esc(r.fm_users?.code||'')}</span></td>
+      <td>${esc(r.fm_users?.fm_departments?.name||'—')}</td>
+      <td>${tick(r.read_at)}</td><td>${tick(r.ack_at)}</td><td>${tick(r.emailed_at)}</td><td>${tick(r.email_opened_at)}</td></tr>`).join('')}
+    </tbody></table></div>`);
 }
 
 // ---------------- boot + PWA ----------------
