@@ -597,8 +597,10 @@ async function openConv(id){
       ${S.features.media_voice?`<button class="cv-btn cv-mic" id="cv-mic">🎤</button>`:''}
       <button class="cv-btn cv-send" onclick="sendText()">➤</button>
       <div id="attach-menu" class="attach-menu hide">
-        <button onclick="pickMedia('image')">📷 Photo</button>
-        ${S.features.media_video?`<button onclick="pickMedia('video')">🎥 Video</button>`:''}
+        <button onclick="pickMedia('image', true)">📷 Take photo</button>
+        <button onclick="pickMedia('image')">🖼 Photo from gallery</button>
+        ${S.features.media_video?`<button onclick="pickMedia('video', true)">🎥 Record video</button>
+        <button onclick="pickMedia('video')">📁 Video from gallery</button>`:''}
         <button onclick="pickMedia('document')">📄 Document</button>
       </div>
       <input type="file" id="cv-file" class="hide"/>
@@ -666,10 +668,14 @@ async function delMsg(id){
 
 // ----- attachments -----
 function toggleAttach(){ document.getElementById('attach-menu').classList.toggle('hide'); }
-function pickMedia(kind){
+function pickMedia(kind, camera){
   toggleAttach();
   const f = document.getElementById('cv-file');
   f.accept = kind==='image'?'image/*':kind==='video'?'video/*':'*/*';
+  // capture=environment opens the phone camera app directly (photo or video
+  // recorder). Desktop browsers ignore it and show the normal file picker.
+  if (camera) f.setAttribute('capture','environment');
+  else f.removeAttribute('capture');
   f.onchange = () => f.files[0] && sendMedia(kind, f.files[0]);
   f.value=''; f.click();
 }
