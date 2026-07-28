@@ -105,6 +105,12 @@ td{padding:8px;border-top:1px solid var(--line);vertical-align:middle}
 .attach-menu{position:absolute;bottom:64px;left:10px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 30px rgba(0,0,0,.15);overflow:hidden;z-index:35}
 .attach-menu button{display:flex;gap:10px;align-items:center;width:100%;border:none;background:none;padding:12px 18px;font-size:14px;font-weight:600}
 .fab{position:fixed;right:18px;bottom:86px;width:56px;height:56px;border-radius:50%;border:none;background:var(--signal);color:#fff;font-size:26px;box-shadow:0 10px 26px rgba(214,90,30,.4);z-index:25}
+/* ---------- camera & preview ---------- */
+#cam-live{width:100%;max-height:52vh;background:#000;border-radius:12px}
+.cam-bar{display:flex;justify-content:center;gap:18px;margin-top:12px}
+.cam-shutter{width:64px;height:64px;border-radius:50%;border:4px solid #fff;background:var(--signal);box-shadow:0 4px 16px rgba(0,0,0,.3);cursor:pointer}
+.cam-shutter.rec{background:var(--stop);animation:pulse 1s infinite}
+.pv-media img,.pv-media video{width:100%;max-height:48vh;border-radius:12px;object-fit:contain;background:#000}
 /* ---------- modal ---------- */
 .overlay{position:fixed;inset:0;background:rgba(20,24,29,.5);z-index:40;display:flex;align-items:flex-end;justify-content:center}
 @media(min-width:640px){.overlay{align-items:center}}
@@ -134,6 +140,7 @@ td{padding:8px;border-top:1px solid var(--line);vertical-align:middle}
     <input id="lg-pass" class="lg-inp" type="password" autocomplete="current-password" placeholder="Your password" onkeydown="if(event.key==='Enter')doLogin()"/>
     <button class="lg-btn" onclick="doLogin()">Sign in</button>
     <div id="lg-err" class="lg-err"></div>
+    <div style="text-align:center;color:#9aa0a8;font-size:11px;margin-top:18px">Build D2.3</div>
   </div>
 </div>
 
@@ -462,7 +469,7 @@ function renderProfile(){
       <div class="row" style="margin-top:12px"><button class="btn p" onclick="changePass()">Update password</button></div>
     </div>
     <div class="card"><button class="btn danger" style="width:100%" onclick="doLogout()">Sign out</button></div>
-    <div style="text-align:center;color:var(--muted);font-size:11px;margin-top:8px">Future Makers v2 · Stage D1</div>`;
+    <div style="text-align:center;color:var(--muted);font-size:11px;margin-top:8px">Future Makers v2 · Build D2.3</div>`;
 }
 async function changePass(){
   try {
@@ -597,9 +604,9 @@ async function openConv(id){
       ${S.features.media_voice?`<button class="cv-btn cv-mic" id="cv-mic">🎤</button>`:''}
       <button class="cv-btn cv-send" onclick="sendText()">➤</button>
       <div id="attach-menu" class="attach-menu hide">
-        <button onclick="pickMedia('image', true)">📷 Take photo</button>
+        <button onclick="openCamera('image')">📷 Take photo</button>
         <button onclick="pickMedia('image')">🖼 Photo from gallery</button>
-        ${S.features.media_video?`<button onclick="pickMedia('video', true)">🎥 Record video</button>
+        ${S.features.media_video?`<button onclick="openCamera('video')">🎥 Record video</button>
         <button onclick="pickMedia('video')">📁 Video from gallery</button>`:''}
         <button onclick="pickMedia('document')">📄 Document</button>
       </div>
@@ -631,9 +638,9 @@ function paintMsgs(){
     let content = '';
     if(m.kind==='text') content = esc(m.body||'').replace(/\n/g,'<br/>');
     else if(m.kind==='image') content = `<img data-media="${esc(m.media_path)}" alt="photo"/>` + (m.body?`<div>${esc(m.body)}</div>`:'');
-    else if(m.kind==='video') content = `<div class="doccard" onclick="openMedia('${esc(m.media_path)}')">🎥 <b>${esc(m.media_name||'Video')}</b></div>`;
+    else if(m.kind==='video') content = `<div class="doccard" onclick="openMedia('${esc(m.media_path)}')">🎥 <b>${esc(m.media_name||'Video')}</b></div>` + (m.body?`<div style="margin-top:4px">${esc(m.body)}</div>`:'');
     else if(m.kind==='audio') content = `<audio controls preload="none" data-audio="${esc(m.media_path)}"></audio>`;
-    else content = `<div class="doccard" onclick="openMedia('${esc(m.media_path)}')">📄 <b style="word-break:break-all">${esc(m.media_name||'File')}</b></div>`;
+    else content = `<div class="doccard" onclick="openMedia('${esc(m.media_path)}')">📄 <b style="word-break:break-all">${esc(m.media_name||'File')}</b></div>` + (m.body?`<div style="margin-top:4px">${esc(m.body)}</div>`:'');
     const tick = mine?`<span class="tick ${readByAll(m)?'read':''}">${readByAll(m)?'✓✓':'✓'}</span>`:'';
     const del = mine?`<span style="cursor:pointer;color:var(--muted)" title="Delete for everyone" onclick="delMsg('${m.id}')">🗑</span>`:'';
     return `<div class="bub ${mine?'me':'them'}">${who}${content}<div class="meta">${del} ${tfmt(m.created_at)} ${tick}</div></div>`;
@@ -668,16 +675,93 @@ async function delMsg(id){
 
 // ----- attachments -----
 function toggleAttach(){ document.getElementById('attach-menu').classList.toggle('hide'); }
-function pickMedia(kind, camera){
+function pickMedia(kind){
   toggleAttach();
   const f = document.getElementById('cv-file');
   f.accept = kind==='image'?'image/*':kind==='video'?'video/*':'*/*';
-  // capture=environment opens the phone camera app directly (photo or video
-  // recorder). Desktop browsers ignore it and show the normal file picker.
-  if (camera) f.setAttribute('capture','environment');
-  else f.removeAttribute('capture');
-  f.onchange = () => f.files[0] && sendMedia(kind, f.files[0]);
+  f.removeAttribute('capture');
+  f.onchange = () => f.files[0] && openPreview(kind, f.files[0], f.files[0].name, f.files[0].type);
   f.value=''; f.click();
+}
+
+// ---------- in-app camera (laptop webcam + phone camera) ----------
+let camStream=null, camRec=null, camChunks=[];
+async function openCamera(kind){
+  toggleAttach();
+  try {
+    camStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' }, audio: kind==='video',
+    });
+  } catch { toast('Camera permission needed — allow it in the browser and try again'); return; }
+  modal(`
+    <div class="m-h"><b>${kind==='video'?'Record video':'Take photo'}</b><button class="m-x" onclick="closeCamera()">×</button></div>
+    <video id="cam-live" autoplay playsinline muted></video>
+    <div class="cam-bar">
+      <button class="cam-shutter" id="cam-btn" title="${kind==='video'?'Start / stop recording':'Capture'}"></button>
+    </div>
+    <div style="text-align:center;font-size:12px;color:var(--muted);margin-top:6px">${kind==='video'?'Tap the button to start, tap again to stop':'Tap the button to capture'}</div>`);
+  document.getElementById('cam-live').srcObject = camStream;
+  const btn = document.getElementById('cam-btn');
+  if(kind==='image'){
+    btn.onclick = () => {
+      const v = document.getElementById('cam-live');
+      const c = document.createElement('canvas'); c.width=v.videoWidth; c.height=v.videoHeight;
+      c.getContext('2d').drawImage(v,0,0);
+      c.toBlob(b => { closeCamera(); if(b) openPreview('image', b, 'photo.jpg', 'image/jpeg'); }, 'image/jpeg', 0.9);
+    };
+  } else {
+    btn.onclick = () => {
+      if(!camRec){
+        camChunks=[]; camRec = new MediaRecorder(camStream);
+        camRec.ondataavailable = e=>camChunks.push(e.data);
+        camRec.onstop = () => {
+          const b = new Blob(camChunks,{type:'video/webm'});
+          closeCamera(); if(b.size>1000) openPreview('video', b, 'video.webm', 'video/webm');
+        };
+        camRec.start(); btn.classList.add('rec');
+      } else { camRec.stop(); camRec=null; }
+    };
+  }
+}
+function closeCamera(){
+  if(camRec){ try{camRec.stop();}catch{} camRec=null; }
+  if(camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream=null; }
+  closeModal();
+}
+
+// ---------- preview before send ----------
+let pending=null;
+function openPreview(kind, blob, name, type){
+  pending = { kind, blob, name, type };
+  const url = URL.createObjectURL(blob);
+  const inner =
+    kind==='image' ? `<div class="pv-media"><img src="${url}"/></div>` :
+    kind==='video' ? `<div class="pv-media"><video src="${url}" controls playsinline></video></div>` :
+    `<div class="doccard" style="margin:6px 0">📄 <b style="word-break:break-all">${esc(name)}</b> <span style="color:var(--muted);font-size:12px">${(blob.size/1024/1024).toFixed(1)} MB</span></div>`;
+  modal(`
+    <div class="m-h"><b>Send ${kind}</b><button class="m-x" onclick="cancelPreview()">×</button></div>
+    ${inner}
+    <input class="inp" id="pv-cap" placeholder="Add a caption (optional)" style="margin-top:10px"/>
+    <div class="row" style="margin-top:12px;justify-content:flex-end">
+      <button class="btn" onclick="cancelPreview()">Cancel</button>
+      <button class="btn p" onclick="confirmSend()">Send ➤</button>
+    </div>`);
+}
+function cancelPreview(){ pending=null; closeModal(); }
+async function confirmSend(){
+  if(!pending) return;
+  const { kind, blob, name, type } = pending;
+  const caption = document.getElementById('pv-cap')?.value?.trim() || '';
+  pending=null; closeModal(); toast('Sending…');
+  try {
+    let data, content_type = type || 'application/octet-stream';
+    if(kind==='image'){ data = await compressImage(blob); content_type='image/jpeg'; }
+    else { data = await fileToB64(blob); }
+    const up = await api('/api/fm/chat/media',{method:'POST',body:{conversation_id:S.chat.active.id,kind,name,data,content_type}});
+    const j = await api('/api/fm/chat/conversations/'+S.chat.active.id+'/messages',{method:'POST',
+      body:{kind,body:caption||null,media_path:up.path,media_name:name,media_size:up.size}});
+    pushLocal(j.message);
+  } catch(e){ toast('⚠ '+e.message); }
 }
 async function fileToB64(file){
   return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result.split(',')[1]); r.onerror=rej; r.readAsDataURL(file); });
@@ -689,14 +773,12 @@ async function compressImage(file){
   c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
   return c.toDataURL('image/jpeg',0.8).split(',')[1];
 }
-async function sendMedia(kind, file, blobOverride){
-  toast('Uploading…');
+async function sendMedia(kind, file, blobOverride){ // voice notes only
+  toast('Sending…');
   try {
-    let data, content_type = file?.type || 'application/octet-stream', name = file?.name || (kind+'.webm');
-    if(kind==='image'){ data = await compressImage(file); content_type='image/jpeg'; }
-    else if(blobOverride){ data = await fileToB64(blobOverride); }
-    else { data = await fileToB64(file); }
-    const up = await api('/api/fm/chat/media',{method:'POST',body:{conversation_id:S.chat.active.id,kind,name,data,content_type}});
+    const name = file?.name || (kind+'.webm');
+    const data = await fileToB64(blobOverride || file);
+    const up = await api('/api/fm/chat/media',{method:'POST',body:{conversation_id:S.chat.active.id,kind,name,data,content_type:file?.type||'audio/webm'}});
     const j = await api('/api/fm/chat/conversations/'+S.chat.active.id+'/messages',{method:'POST',
       body:{kind,media_path:up.path,media_name:name,media_size:up.size}});
     pushLocal(j.message);
