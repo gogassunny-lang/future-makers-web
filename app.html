@@ -500,12 +500,36 @@ async function renderChat(){
           <div class="cl-time">${tfmt(c.last?.created_at)}</div>
           ${c.unread?`<span class="cl-badge">${c.unread}</span>`:''}
         </div>
+        <button class="btn sm" style="border:none;font-size:16px;padding:2px 6px" onclick="event.stopPropagation();chatMenu('${c.id}')">⋮</button>
       </div>`).join('') : `<div class="card" style="text-align:center;color:var(--muted)">No chats yet — start one with +</div>`}
     ${canNew?`<button class="fab" onclick="openNewChat()">＋</button>`:''}`;
 }
 function previewOf(m){
   if(m.kind==='text'||m.kind==='system') return m.body||'';
   return {image:'📷 Photo',video:'🎥 Video',audio:'🎤 Voice note',document:'📄 '+(m.media_name||'Document')}[m.kind]||'…';
+}
+
+// ----- chat item menu: delete / leave -----
+function chatMenu(id){
+  const c = S.chat.convs.find(x=>x.id===id); if(!c) return;
+  const iAmGroupAdmin = c.kind==='group' && (['super_admin','admin'].includes(S.profile.platform_role) ||
+    c.members?.find(m=>m.user_id===S.profile.id)?.member_role==='admin');
+  modal(`
+    <div class="m-h"><b>${esc(c.title)}</b><button class="m-x" onclick="closeModal()">×</button></div>
+    ${c.kind==='direct'
+      ? `<button class="btn danger" style="width:100%" onclick="delConv('${c.id}','This deletes the chat for BOTH sides. Continue?')">🗑 Delete chat (both sides)</button>`
+      : `<button class="btn" style="width:100%;margin-bottom:8px" onclick="leaveGroup('${c.id}')">🚪 Leave group</button>
+         ${iAmGroupAdmin?`<button class="btn danger" style="width:100%" onclick="delConv('${c.id}','This deletes the group and ALL its messages for everyone. Continue?')">🗑 Delete group</button>`:''}`}`);
+}
+async function delConv(id, warn){
+  if(!confirm(warn)) return;
+  try { await api('/api/fm/chat/conversations/'+id,{method:'DELETE'}); toast('Deleted'); closeModal(); renderChat(); }
+  catch(e){ toast('⚠ '+e.message); }
+}
+async function leaveGroup(id){
+  if(!confirm('Leave this group?')) return;
+  try { await api('/api/fm/chat/conversations/'+id+'/leave',{method:'POST'}); toast('You left the group'); closeModal(); renderChat(); }
+  catch(e){ toast('⚠ '+e.message); }
 }
 
 // ----- new chat -----
@@ -548,8 +572,12 @@ async function createGroup(){
 
 // ----- conversation view -----
 async function openConv(id){
-  const c = S.chat.convs.find(x=>x.id===id);
-  S.chat.active = c || { id, title:'Chat', kind:'direct', members:[] };
+  let c = S.chat.convs.find(x=>x.id===id);
+  if(!c){
+    try { c = await api('/api/fm/chat/conversations/'+id); }
+    catch(e){ toast('⚠ '+e.message); return; }
+  }
+  S.chat.active = c;
   let el = document.getElementById('conv');
   if(!el){ el = document.createElement('div'); el.id='conv'; document.body.appendChild(el); }
   el.classList.remove('hide');
@@ -605,7 +633,8 @@ function paintMsgs(){
     else if(m.kind==='audio') content = `<audio controls preload="none" data-audio="${esc(m.media_path)}"></audio>`;
     else content = `<div class="doccard" onclick="openMedia('${esc(m.media_path)}')">📄 <b style="word-break:break-all">${esc(m.media_name||'File')}</b></div>`;
     const tick = mine?`<span class="tick ${readByAll(m)?'read':''}">${readByAll(m)?'✓✓':'✓'}</span>`:'';
-    return `<div class="bub ${mine?'me':'them'}">${who}${content}<div class="meta">${tfmt(m.created_at)} ${tick}</div></div>`;
+    const del = mine?`<span style="cursor:pointer;color:var(--muted)" title="Delete for everyone" onclick="delMsg('${m.id}')">🗑</span>`:'';
+    return `<div class="bub ${mine?'me':'them'}">${who}${content}<div class="meta">${del} ${tfmt(m.created_at)} ${tick}</div></div>`;
   }).join('');
   box.scrollTop = box.scrollHeight;
   box.querySelectorAll('[data-media]').forEach(async img=>{ img.src = await mediaUrl(img.dataset.media); });
@@ -628,6 +657,12 @@ async function sendText(){
   } catch(e){ toast('⚠ '+e.message); el.value=body; }
 }
 function pushLocal(m){ if(!S.chat.msgs.find(x=>x.id===m.id)){ S.chat.msgs.push(m); paintMsgs(); } }
+async function delMsg(id){
+  if(!confirm('Delete this message for everyone?')) return;
+  try { await api('/api/fm/chat/messages/'+id,{method:'DELETE'});
+    S.chat.msgs = S.chat.msgs.filter(x=>x.id!==id); paintMsgs();
+  } catch(e){ toast('⚠ '+e.message); }
+}
 
 // ----- attachments -----
 function toggleAttach(){ document.getElementById('attach-menu').classList.toggle('hide'); }
@@ -688,6 +723,11 @@ function wireMic(){
 function ensureRealtime(){
   if(S.chat.sub) return; S.chat.sub = true;
   sb.channel('fm-chat')
+    .on('postgres_changes',{event:'DELETE',schema:'public',table:'fm_messages'}, payload => {
+      const id = payload.old?.id; if(!id) return;
+      const had = S.chat.msgs.find(x=>x.id===id);
+      if(had){ S.chat.msgs = S.chat.msgs.filter(x=>x.id!==id); paintMsgs(); }
+    })
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'fm_messages'}, payload => {
       const m = payload.new;
       if(S.chat.active && m.conversation_id===S.chat.active.id){
