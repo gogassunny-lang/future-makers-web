@@ -140,7 +140,7 @@ td{padding:8px;border-top:1px solid var(--line);vertical-align:middle}
     <input id="lg-pass" class="lg-inp" type="password" autocomplete="current-password" placeholder="Your password" onkeydown="if(event.key==='Enter')doLogin()"/>
     <button class="lg-btn" onclick="doLogin()">Sign in</button>
     <div id="lg-err" class="lg-err"></div>
-    <div style="text-align:center;color:#9aa0a8;font-size:11px;margin-top:18px">Build D3</div>
+    <div style="text-align:center;color:#9aa0a8;font-size:11px;margin-top:18px">Build D4.0</div>
   </div>
 </div>
 
@@ -172,7 +172,7 @@ const FM_MARK = (size=34, opts={}) => {
 document.getElementById('lg-mark').innerHTML = FM_MARK(40);
 document.getElementById('tb-mark').innerHTML = FM_MARK(30);
 
-let S = { profile:null, features:{}, page:'home', users:[], depts:[], matrix:null };
+let S = { profile:null, features:{}, page:'home', users:[], depts:[], matrix:null, tk:{ view:'mine', pick:null, steps:[] } };
 const esc = s => String(s??'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function toast(m){ const t=document.createElement('div'); t.className='toast'; t.textContent=m; document.body.appendChild(t); setTimeout(()=>t.remove(),2600); }
 
@@ -226,7 +226,7 @@ function renderTabs(){
     { id:'home', ic:'🏠', t:'Home' },
     { id:'chat', ic:'💬', t:'Chat' },
     { id:'broadcast', ic:'📣', t:'Broadcast' },
-    { id:'tasks', ic:'✅', t:'Tasks', soon:true },
+    { id:'tasks', ic:'✅', t:'Tasks' },
     ...(isAdmin() ? [{ id:'admin', ic:'🛠', t:'Admin' }] : []),
     { id:'profile', ic:'👤', t:'Me' },
   ];
@@ -234,7 +234,7 @@ function renderTabs(){
     `<button class="tab ${S.page===x.id?'on':''}" onclick="${x.soon?`toast('${x.t} arrives in the next stage')`:`go('${x.id}')`}">
       <span class="ic">${x.ic}</span>${x.t}</button>`).join('');
 }
-function go(p){ S.page=p; renderTabs(); ({home:renderHome, admin:renderAdmin, profile:renderProfile, chat:renderChat, broadcast:renderBroadcast}[p]||renderHome)(); }
+function go(p){ S.page=p; renderTabs(); ({home:renderHome, admin:renderAdmin, profile:renderProfile, chat:renderChat, broadcast:renderBroadcast, tasks:renderTasks}[p]||renderHome)(); }
 
 // ---------------- HOME ----------------
 function renderHome(){
@@ -245,7 +245,7 @@ function renderHome(){
     <div class="grid2">
       ${f.chat_direct||f.chat_groups ? `<div class="tile" onclick="go('chat')" style="cursor:pointer"><div class="ic">💬</div><div class="t">Chat</div><div class="s">Messages · groups · media</div></div>`:''}
       <div class="tile" onclick="go('broadcast')" style="cursor:pointer"><div class="ic">📣</div><div class="t">${f.broadcast_create?'Broadcasts':'Announcements'}</div><div class="s">Instructions · schedule · tracking</div></div>
-      ${f.tasks_view ? tile('✅','Tasks','Full WatchOwl · Stage D4',1):''}
+      ${f.tasks_view ? `<div class="tile" onclick="go('tasks')" style="cursor:pointer"><div class="ic">✅</div><div class="t">Tasks</div><div class="s">Steps · SLA · accountability</div></div>`:''}
       ${f.meetings_join ? tile('📅','Meetings','Meet + AI minutes · Stage D5',1):''}
       ${isAdmin() ? `<div class="tile" onclick="go('admin')" style="cursor:pointer;border-color:var(--signal)"><div class="ic">🛠</div><div class="t">Admin</div><div class="s">Users · Departments · Access</div></div>`:''}
       ${tile('🛰','Platform','Stage D1 live — foundation running',0)}
@@ -469,7 +469,7 @@ function renderProfile(){
       <div class="row" style="margin-top:12px"><button class="btn p" onclick="changePass()">Update password</button></div>
     </div>
     <div class="card"><button class="btn danger" style="width:100%" onclick="doLogout()">Sign out</button></div>
-    <div style="text-align:center;color:var(--muted);font-size:11px;margin-top:8px">Future Makers v2 · Build D3</div>`;
+    <div style="text-align:center;color:var(--muted);font-size:11px;margin-top:8px">Future Makers v2 · Build D4.0</div>`;
 }
 async function changePass(){
   try {
@@ -811,6 +811,15 @@ function wireMic(){
 function ensureRealtime(){
   if(S.chat.sub) return; S.chat.sub = true;
   sb.channel('fm-chat')
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'fm_task_events'}, payload => {
+      const k = payload.new?.kind;
+      if(k==='activated' && payload.new?.actor_id!==S.profile.id) toast('✅ A task step is waiting');
+      if(S.page==='tasks'){
+        if(S.tk.view==='mine') paintMine();
+        else if(S.tk.view==='all') paintAllTasks();
+        if(S.tk.openTask===payload.new?.task_id && document.getElementById('tk-detail')) openTask(S.tk.openTask, true);
+      }
+    })
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'fm_broadcast_receipts'}, payload => {
       if(payload.new?.user_id===S.profile.id){
         toast('📣 New broadcast received');
@@ -952,7 +961,7 @@ async function openComposer(){
       <option value="recur">🔁 Recurring</option>
     </select>
     <div id="bc-when" style="margin-top:8px"></div>
-    <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn p" onclick="createBroadcast()">Create</button></div>`);
+    <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn p" id="bc-go" onclick="createBroadcast()">Create</button></div>`);
   bcModeUI();
 }
 function bcModeUI(){
@@ -1007,6 +1016,7 @@ async function createBroadcast(){
     channels:{ inapp:true, email: document.getElementById('bc-email')?.checked===true },
     ack_required: document.getElementById('bc-ack').checked,
     send_mode: mode,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata',
   };
   if(mode==='schedule'){
     const at = document.getElementById('bc-at').value;
@@ -1019,19 +1029,24 @@ async function createBroadcast(){
       time:document.getElementById('bc-time').value||'09:00',
       end_date:document.getElementById('bc-end').value||null };
   }
+  const go = document.getElementById('bc-go');
+  if(go){ if(go.disabled) return; go.disabled = true; go.textContent = 'Sending…'; }
   try {
     const r = await api('/api/fm/broadcasts',{method:'POST',body});
     toast(mode==='now' ? ('Sent to '+(r.fired?.recipients??0)+' people 🚀') : 'Broadcast scheduled ✔');
     closeModal(); S.bc.view='manage'; renderBroadcast();
-  } catch(e){ toast('⚠ '+e.message); }
+  } catch(e){
+    toast('⚠ '+e.message);
+    if(go){ go.disabled = false; go.textContent = 'Create'; }
+  }
 }
 
 // ----- report modal -----
 async function openReport(id){
   let j; try { j = await api('/api/fm/broadcasts/'+id+'/report'); } catch(e){ toast('⚠ '+e.message); return; }
   const rec = j.receipts||[];
-  const n = { d:rec.length, r:rec.filter(x=>x.read_at).length, a:rec.filter(x=>x.ack_at).length,
-              e:rec.filter(x=>x.emailed_at).length, o:rec.filter(x=>x.email_opened_at).length };
+  const c = j.counts || {};
+  const n = { d:c.delivered??rec.length, r:c.read??0, a:c.ack??0, e:c.emailed??0, o:c.email_opened??0 };
   const tick = v => v?'<span style="color:var(--go);font-weight:800">✓</span>':'<span style="color:#ccc">—</span>';
   modal(`
     <div class="m-h"><b>📊 ${esc(j.broadcast.title)}</b><button class="m-x" onclick="closeModal()">×</button></div>
@@ -1046,6 +1061,255 @@ async function openReport(id){
       <td>${esc(r.fm_users?.fm_departments?.name||'—')}</td>
       <td>${tick(r.read_at)}</td><td>${tick(r.ack_at)}</td><td>${tick(r.emailed_at)}</td><td>${tick(r.email_opened_at)}</td></tr>`).join('')}
     </tbody></table></div>`);
+}
+
+
+// ---------------- TASKS (Stage D4.0 — the WatchOwl port) ----------------
+const TK_PRI = { critical:['CRITICAL','var(--stop)'], high:['High','var(--signal)'], normal:['Normal','var(--muted)'], low:['Low','#9aa0a8'] };
+const tkPri = p => { const [t,c]=TK_PRI[p]||TK_PRI.normal; return `<span style="font-size:11px;font-weight:800;color:${c}">${t}</span>`; };
+const tkDue = d => {
+  if(!d) return '';
+  const ms = new Date(d) - Date.now(), h = Math.abs(ms)/36e5;
+  const span = h>=48 ? Math.round(h/24)+'d' : h>=1 ? Math.round(h)+'h' : Math.max(1,Math.round(h*60))+'m';
+  return ms<0 ? `<span style="color:var(--stop);font-weight:800">⏰ overdue by ${span}</span>`
+              : `<span style="color:var(--muted)">due in ${span}</span>`;
+};
+const tkStatus = st => ({active:'<span class="pill on">Active</span>',
+  completed:'<span class="pill on" style="background:var(--go);border-color:var(--go)">Done</span>',
+  blocked:'<span class="pill off">Blocked</span>', cancelled:'<span class="pill off">Cancelled</span>',
+  draft:'<span class="pill off">Draft</span>'}[st]||esc(st));
+
+async function renderTasks(){
+  const canCreate = S.features.tasks_create===true;
+  if(S.features.tasks_view!==true){ document.getElementById('main').innerHTML = `<div class="card">Tasks are not enabled for your account.</div>`; return; }
+  document.getElementById('main').innerHTML = `
+    <div class="h1">✅ Tasks</div>
+    <div class="row" style="margin-bottom:12px">
+      <button class="btn ${S.tk.view==='mine'?'g':''}" onclick="S.tk.view='mine';renderTasks()">My steps</button>
+      <button class="btn ${S.tk.view==='all'?'g':''}" onclick="S.tk.view='all';renderTasks()">All tasks</button>
+      ${canCreate?`<button class="btn p" style="margin-left:auto" onclick="openTaskBuilder()">+ New task</button>`:''}
+    </div>
+    <div id="tk-body"><div class="card">Loading…</div></div>`;
+  if(S.tk.view==='mine') await paintMine(); else await paintAllTasks();
+}
+
+async function paintMine(){
+  let j; try { j = await api('/api/fm/tasks/mine'); }
+  catch(e){ const el=document.getElementById('tk-body'); if(el) el.innerHTML=`<div class="card">⚠ ${esc(e.message)}</div>`; return; }
+  const el = document.getElementById('tk-body'); if(!el) return;
+  const steps = j.steps||[];
+  el.innerHTML = steps.length ? steps.map(st=>`
+    <div class="card" style="${st.due_at && new Date(st.due_at)<Date.now()?'border-left:4px solid var(--stop)':'border-left:4px solid var(--signal)'}">
+      <div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="min-width:0">
+          <b style="font-size:15px">${esc(st.name)}</b>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:2px">
+            <span style="font-family:ui-monospace,monospace">${esc(st.task.ref)}</span> · ${esc(st.task.title)} · ${tkPri(st.task.priority)}</div>
+          <div style="font-size:12px;margin-top:4px">${tkDue(st.due_at)}</div>
+        </div>
+        <div class="row" style="gap:6px;flex:none">
+          <button class="btn sm" onclick="openTask('${st.task_id}')">Open</button>
+          <button class="btn sm p" onclick="tkCompleteModal('${st.task_id}','${st.step_id}','${esc(st.name).replace(/'/g,"\\'")}')">Mark done</button>
+        </div>
+      </div>
+    </div>`).join('')
+  : `<div class="card" style="text-align:center;color:var(--muted)">Nothing waiting on you 🎉<br><span style="font-size:12px">Steps assigned to you appear here when they become active.</span></div>`;
+}
+
+async function paintAllTasks(){
+  let j; try { j = await api('/api/fm/tasks'+(S.tk.filter?('?status='+S.tk.filter):'')); }
+  catch(e){ const el=document.getElementById('tk-body'); if(el) el.innerHTML=`<div class="card">⚠ ${esc(e.message)}</div>`; return; }
+  const el = document.getElementById('tk-body'); if(!el) return;
+  const tasks = j.tasks||[];
+  const fbtn = (v,l)=>`<button class="btn sm ${S.tk.filter===v?'g':''}" onclick="S.tk.filter=${v?`'${v}'`:'null'};paintAllTasks()">${l}</button>`;
+  el.innerHTML = `<div class="row" style="margin-bottom:10px;flex-wrap:wrap;gap:6px">
+      ${fbtn(null,'All')}${fbtn('active','Active')}${fbtn('completed','Done')}${fbtn('cancelled','Cancelled')}</div>`
+    + (tasks.length ? tasks.map(t=>{
+      const p=t.progress||{total:0,done:0};
+      const pct = p.total? Math.round(p.done/p.total*100):0;
+      return `<div class="card" style="cursor:pointer" onclick="openTask('${t.id}')">
+        <div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px">
+          <div style="min-width:0">
+            <b style="font-size:15px">${esc(t.title)}</b>
+            <div style="font-size:11.5px;color:var(--muted);margin-top:2px">
+              <span style="font-family:ui-monospace,monospace">${esc(t.ref)}</span>
+              · ${esc(t.fm_departments?.name||'—')} · by ${esc(t.fm_users?.name||'—')} · ${tkPri(t.priority)}
+              ${t.scope==='cross'?' · 🔀 cross-dept':''}</div>
+            <div style="font-size:12px;margin-top:4px;color:var(--muted)">
+              ${p.done}/${p.total} steps${p.current?` · now: <b style="color:var(--ink)">${esc(p.current)}</b>`:''}</div>
+          </div>
+          <div style="flex:none;text-align:right">${tkStatus(t.status)}
+            <div style="width:86px;height:6px;background:rgba(20,24,29,.08);border-radius:4px;margin-top:8px;overflow:hidden">
+              <div style="width:${pct}%;height:100%;background:${t.status==='completed'?'var(--go)':'var(--signal)'}"></div></div>
+          </div>
+        </div>
+      </div>`;}).join('')
+    : `<div class="card" style="text-align:center;color:var(--muted)">No tasks yet.</div>`);
+}
+
+// ----- detail -----
+async function openTask(id, refresh){
+  let j; try { j = await api('/api/fm/tasks/'+id); } catch(e){ toast('⚠ '+e.message); return; }
+  S.tk.openTask = id;
+  const t=j.task, steps=j.steps||[], ev=j.events||[];
+  const me=S.profile, admin=isAdmin();
+  const canReverse = admin || t.created_by===me.id || me.task_role==='reviewer' || me.task_role==='manager';
+  const canApprove = t.status==='completed' && !t.approved_at && (admin || t.reviewer_id===me.id);
+  const canCancel  = !['completed','cancelled'].includes(t.status) && (admin || t.created_by===me.id) && S.features.tasks_create===true;
+  const seqs=[...new Set(steps.map(x=>x.seq))].sort((a,b)=>a-b);
+  const stepRow = st => {
+    const mine = (st.assignees||[]).some(a=>a.id===me.id);
+    const col = st.status==='done'?'var(--go)':st.status==='active'?(st.due_at&&new Date(st.due_at)<Date.now()?'var(--stop)':'var(--signal)'):'#c9c4b4';
+    return `<div class="row" style="gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid rgba(20,24,29,.06)">
+      <div style="flex:none;width:12px;height:12px;border-radius:50%;background:${col};margin-top:4px"></div>
+      <div style="min-width:0;flex:1">
+        <b style="font-size:13.5px">${esc(st.name)}</b>
+        <div style="font-size:11.5px;color:var(--muted)">${esc(st.fm_departments?.name||'—')} · ${(st.assignees||[]).map(a=>esc(a.name)).join(', ')||'unassigned'}
+          ${st.status==='active'?' · '+tkDue(st.due_at):''}
+          ${st.status==='done'?` · done ${tfmt(st.completed_at)}${st.note?` — "${esc(st.note)}"`:''}`:''}</div>
+      </div>
+      <div class="row" style="gap:6px;flex:none">
+        ${st.status==='active'&&(mine||admin||me.task_role==='manager')?`<button class="btn sm p" onclick="tkCompleteModal('${t.id}','${st.id}','${esc(st.name).replace(/'/g,"\\'")}')">Done</button>`:''}
+        ${['done','active'].includes(st.status)&&canReverse?`<button class="btn sm" onclick="tkReverseModal('${t.id}','${st.id}','${esc(st.name).replace(/'/g,"\\'")}')">↩</button>`:''}
+      </div></div>`;
+  };
+  modal(`<div id="tk-detail">
+    <div class="m-h"><b>${esc(t.title)}</b><button class="m-x" onclick="closeModal()">×</button></div>
+    <div style="font-size:11.5px;color:var(--muted);margin-top:-4px;margin-bottom:6px">
+      <span style="font-family:ui-monospace,monospace">${esc(t.ref)}</span> · ${tkPri(t.priority)} · ${tkStatus(t.status)}
+      ${t.approved_at?` · <span style="color:var(--go);font-weight:700">approved</span>`:t.status==='completed'?' · awaiting review':''}</div>
+    ${t.description?`<div style="font-size:13px;margin:8px 0;white-space:pre-wrap">${esc(t.description)}</div>`:''}
+    <div class="h2" style="margin-top:10px">Steps</div>
+    ${seqs.map(q=>{
+      const group=steps.filter(x=>x.seq===q);
+      return (group.length>1?`<div style="font-size:10.5px;color:var(--muted);margin-top:6px">▼ in parallel</div>`:'')+group.map(stepRow).join('');
+    }).join('')}
+    <div class="row" style="margin-top:12px;gap:8px">
+      ${canApprove?`<button class="btn p" onclick="tkApprove('${t.id}')">Approve task</button>`:''}
+      ${canCancel?`<button class="btn" style="color:var(--stop)" onclick="tkCancel('${t.id}')">Cancel task</button>`:''}
+    </div>
+    <div class="h2" style="margin-top:14px">Timeline</div>
+    <div style="max-height:180px;overflow:auto">
+      ${ev.map(e=>`<div style="font-size:11.5px;color:var(--muted);padding:3px 0">
+        ${tfmt(e.at)} · <b style="color:var(--ink)">${esc(e.fm_users?.name||'system')}</b> ${esc(e.kind)}
+        ${e.detail?.step?` — ${esc(e.detail.step)}`:''}${e.detail?.reason?` · "${esc(e.detail.reason)}"`:''}${e.detail?.note?` · "${esc(e.detail.note)}"`:''}
+      </div>`).join('')||'<div style="font-size:12px;color:var(--muted)">—</div>'}
+    </div>
+  </div>`);
+  if(refresh===true){} // re-render path used by realtime
+}
+
+// ----- actions -----
+function tkCompleteModal(taskId, stepId, name){
+  modal(`<b style="font-size:15px">Mark done — ${name}</b>
+    <textarea id="tk-note" class="inp" rows="3" placeholder="Note (optional): what was done, reference numbers…" style="margin-top:10px"></textarea>
+    <div class="row" style="justify-content:flex-end;gap:8px;margin-top:12px">
+      <button class="btn" onclick="closeModal()">Back</button>
+      <button class="btn p" id="tk-done-go" onclick="tkComplete('${taskId}','${stepId}')">Mark done</button></div>`);
+}
+async function tkComplete(taskId, stepId){
+  const go=document.getElementById('tk-done-go'); if(go){ if(go.disabled) return; go.disabled=true; go.textContent='Saving…'; }
+  try {
+    const r = await api(`/api/fm/tasks/${taskId}/steps/${stepId}/complete`,{method:'POST',body:{note:document.getElementById('tk-note')?.value.trim()||null}});
+    toast(r.task_completed ? (r.awaiting_review?'Task complete — waiting for review ✔':'Task complete ✔') : r.advanced ? 'Done — next step activated ➜' : 'Step done ✔');
+    closeModal(); renderTasks();
+  } catch(e){ toast('⚠ '+e.message); if(go){ go.disabled=false; go.textContent='Mark done'; } }
+}
+function tkReverseModal(taskId, stepId, name){
+  modal(`<b style="font-size:15px">Send back — ${name}</b>
+    <div style="font-size:12px;color:var(--muted);margin-top:4px">This re-opens the step with a fresh SLA clock and returns everything after it to pending. A reason is required.</div>
+    <textarea id="tk-reason" class="inp" rows="3" placeholder="Why is this going back?" style="margin-top:10px"></textarea>
+    <div class="row" style="justify-content:flex-end;gap:8px;margin-top:12px">
+      <button class="btn" onclick="closeModal()">Back</button>
+      <button class="btn" style="color:var(--stop)" onclick="tkReverse('${taskId}','${stepId}')">Send back</button></div>`);
+}
+async function tkReverse(taskId, stepId){
+  const reason=document.getElementById('tk-reason')?.value.trim();
+  if(!reason){ toast('A reason is required'); return; }
+  try { await api(`/api/fm/tasks/${taskId}/steps/${stepId}/reverse`,{method:'POST',body:{reason}});
+    toast('Step sent back ↩'); closeModal(); renderTasks();
+  } catch(e){ toast('⚠ '+e.message); }
+}
+async function tkApprove(id){
+  try { await api(`/api/fm/tasks/${id}/approve`,{method:'POST'}); toast('Approved ✔'); closeModal(); renderTasks(); }
+  catch(e){ toast('⚠ '+e.message); }
+}
+async function tkCancel(id){
+  modal(`<b style="font-size:15px">Cancel this task?</b>
+    <div style="font-size:12px;color:var(--muted);margin-top:4px">All pending and active steps stop. The timeline is kept.</div>
+    <div class="row" style="justify-content:flex-end;gap:8px;margin-top:12px">
+      <button class="btn" onclick="closeModal()">Keep it</button>
+      <button class="btn" style="color:var(--stop)" onclick="tkCancelGo('${id}')">Cancel task</button></div>`);
+}
+async function tkCancelGo(id){
+  try { await api(`/api/fm/tasks/${id}/cancel`,{method:'POST'}); toast('Task cancelled'); closeModal(); renderTasks(); }
+  catch(e){ toast('⚠ '+e.message); }
+}
+
+// ----- builder -----
+async function openTaskBuilder(){
+  if(!S.tk.pick){
+    try { S.tk.pick = await api('/api/fm/tasks/pickers'); }
+    catch(e){ toast('⚠ '+e.message); return; }
+  }
+  S.tk.steps = [{ name:'', department_id:'', with_previous:false, assignees:[] }];
+  tkBuilderPaint();
+}
+function tkBuilderPaint(){
+  const { users, departments } = S.tk.pick;
+  const deptOpt = sel => `<option value="">— dept —</option>`+departments.map(d=>`<option value="${d.id}" ${String(sel)===String(d.id)?'selected':''}>${esc(d.name)} (${d.sla_hours}h SLA)</option>`).join('');
+  const stepCard = (st,i) => `
+    <div class="card" style="padding:10px;margin-top:8px">
+      <div class="row" style="gap:8px;align-items:center">
+        <b style="flex:none;color:var(--muted);font-size:12px">${i+1}</b>
+        <input class="inp" style="flex:1" placeholder="Step name (e.g. Raise PO)" value="${esc(st.name)}"
+          oninput="S.tk.steps[${i}].name=this.value">
+        ${i>0?`<label style="font-size:11px;color:var(--muted);flex:none"><input type="checkbox" ${st.with_previous?'checked':''}
+          onchange="S.tk.steps[${i}].with_previous=this.checked;tkBuilderPaint()"> with previous</label>`:''}
+        ${S.tk.steps.length>1?`<button class="btn sm" onclick="S.tk.steps.splice(${i},1);tkBuilderPaint()">×</button>`:''}
+      </div>
+      <div class="row" style="gap:8px;margin-top:8px">
+        <select class="inp" style="flex:1" onchange="S.tk.steps[${i}].department_id=this.value;tkBuilderPaint()">${deptOpt(st.department_id)}</select>
+        <select class="inp" multiple size="3" style="flex:1.4" onchange="S.tk.steps[${i}].assignees=[...this.selectedOptions].map(o=>o.value)">
+          ${users.filter(u=>!st.department_id||String(u.department_id)===String(st.department_id))
+            .map(u=>`<option value="${u.id}" ${st.assignees.includes(u.id)?'selected':''}>${esc(u.name)} (${esc(u.code)})</option>`).join('')}
+        </select>
+      </div>
+    </div>`;
+  const reviewers = users.filter(u=>u.task_role==='reviewer');
+  modal(`<div class="m-h"><b>New task</b><button class="m-x" onclick="closeModal()">×</button></div>
+    <input id="tkb-title" class="inp" placeholder="Task title (e.g. LPG procurement — August)" style="margin-top:10px" value="${esc(S.tk.title||'')}" oninput="S.tk.title=this.value">
+    <textarea id="tkb-desc" class="inp" rows="2" placeholder="Description (optional)" style="margin-top:8px" oninput="S.tk.desc=this.value">${esc(S.tk.desc||'')}</textarea>
+    <div class="row" style="gap:8px;margin-top:8px">
+      <select id="tkb-pri" class="inp" style="flex:1">
+        ${['normal','high','critical','low'].map(x=>`<option ${S.tk.pri===x?'selected':''}>${x}</option>`).join('')}</select>
+      <select id="tkb-rev" class="inp" style="flex:1.4">
+        <option value="">No reviewer (auto-approve)</option>
+        ${reviewers.map(u=>`<option value="${u.id}">${esc(u.name)} — reviewer</option>`).join('')}</select>
+    </div>
+    <div class="h2" style="margin-top:12px">Steps <span style="font-size:11px;color:var(--muted);font-weight:400">— "with previous" runs steps in parallel</span></div>
+    <div style="max-height:300px;overflow:auto">${S.tk.steps.map(stepCard).join('')}</div>
+    <button class="btn sm" style="margin-top:8px" onclick="S.tk.steps.push({name:'',department_id:'',with_previous:false,assignees:[]});tkBuilderPaint()">+ Add step</button>
+    <div class="row" style="justify-content:flex-end;gap:8px;margin-top:12px">
+      <button class="btn" onclick="closeModal()">Back</button>
+      <button class="btn p" id="tkb-go" onclick="tkCreate()">Launch task</button></div>`);
+}
+async function tkCreate(){
+  const title=(S.tk.title||'').trim();
+  if(!title){ toast('Give the task a title'); return; }
+  if(S.tk.steps.some(x=>!x.name.trim())){ toast('Every step needs a name'); return; }
+  if(S.tk.steps.some(x=>!x.assignees.length)){ toast('Every step needs at least one assignee'); return; }
+  const go=document.getElementById('tkb-go'); if(go){ if(go.disabled) return; go.disabled=true; go.textContent='Launching…'; }
+  try {
+    const r = await api('/api/fm/tasks',{method:'POST',body:{
+      title, description:(S.tk.desc||'').trim()||null,
+      priority:document.getElementById('tkb-pri').value,
+      reviewer_id:document.getElementById('tkb-rev').value||null,
+      steps:S.tk.steps }});
+    toast(`Task ${r.task.ref} launched — first step is live 🚀`);
+    S.tk.title=''; S.tk.desc='';
+    closeModal(); S.tk.view='all'; renderTasks();
+  } catch(e){ toast('⚠ '+e.message); if(go){ go.disabled=false; go.textContent='Launch task'; } }
 }
 
 // ---------------- boot + PWA ----------------
