@@ -220,7 +220,7 @@ td{padding:8px;border-top:1px solid var(--line);vertical-align:middle}
     <input id="lg-pass" class="lg-inp" type="password" autocomplete="current-password" placeholder="Your password" onkeydown="if(event.key==='Enter')doLogin()"/>
     <button class="lg-btn" onclick="doLogin()">Sign in</button>
     <div id="lg-err" class="lg-err"></div>
-    <div style="text-align:center;color:#8696A0;font-size:11px;margin-top:18px">Build D4.3</div>
+    <div style="text-align:center;color:#8696A0;font-size:11px;margin-top:18px">Build D5.0</div>
   </div>
 </div>
 
@@ -361,6 +361,7 @@ function renderTabs(){
     { id:'chat', ic:'💬', t:'Chat' },
     { id:'broadcast', ic:'📣', t:'Broadcast' },
     { id:'tasks', ic:'✅', t:'Tasks' },
+    ...(S.features?.meetings_join ? [{ id:'meetings', ic:'📅', t:'Meetings' }] : []),
     ...(isAdmin() ? [{ id:'admin', ic:'🛠', t:'Admin' }] : []),
     { id:'profile', ic:'👤', t:'Me' },
   ];
@@ -380,7 +381,7 @@ function renderTabs(){
       return items ? `<div class="nav-section"><div class="nav-label">${label}</div>${items}</div>` : '';
     };
     nav.innerHTML =
-      sec('Workspace', ['home','chat','broadcast','tasks']) +
+      sec('Workspace', ['home','chat','broadcast','tasks','meetings']) +
       sec('Admin', ['admin'], 'owner-nav') +
       sec('Account', ['profile']);
   }
@@ -389,7 +390,7 @@ function renderTabs(){
   const cr = document.getElementById('sb-create');
   if(cr) cr.style.display = S.features?.tasks_create ? 'block' : 'none';
 }
-function go(p){ S.page=p; renderTabs(); ({home:renderHome, admin:renderAdmin, profile:renderProfile, chat:renderChat, broadcast:renderBroadcast, tasks:renderTasks}[p]||renderHome)(); }
+function go(p){ S.page=p; renderTabs(); ({home:renderHome, admin:renderAdmin, profile:renderProfile, chat:renderChat, broadcast:renderBroadcast, tasks:renderTasks, meetings:renderMeetings}[p]||renderHome)(); }
 
 // ---------------- HOME ----------------
 function renderHome(){
@@ -401,7 +402,7 @@ function renderHome(){
       ${f.chat_direct||f.chat_groups ? `<div class="tile" onclick="go('chat')" style="cursor:pointer"><div class="ic">💬</div><div class="t">Chat</div><div class="s">Messages · groups · media</div></div>`:''}
       <div class="tile" onclick="go('broadcast')" style="cursor:pointer"><div class="ic">📣</div><div class="t">${f.broadcast_create?'Broadcasts':'Announcements'}</div><div class="s">Instructions · schedule · tracking</div></div>
       ${f.tasks_view ? `<div class="tile" onclick="go('tasks')" style="cursor:pointer"><div class="ic">✅</div><div class="t">Tasks</div><div class="s">Steps · SLA · accountability</div></div>`:''}
-      ${f.meetings_join ? tile('📅','Meetings','Meet + AI minutes · Stage D5',1):''}
+      ${f.meetings_join ? `<div class="tile" onclick="go('meetings')" style="cursor:pointer"><div class="ic">📅</div><div class="t">Meetings</div><div class="s">Schedule · remind · join</div></div>`:''}
       ${isAdmin() ? `<div class="tile" onclick="go('admin')" style="cursor:pointer;border-color:var(--signal)"><div class="ic">🛠</div><div class="t">Admin</div><div class="s">Users · Departments · Access</div></div>`:''}
       ${tile('🛰','Platform','Stage D1 live — foundation running',0)}
     </div>
@@ -636,7 +637,7 @@ function renderProfile(){
       </div>
     </div>
     <div class="card"><button class="btn danger" style="width:100%" onclick="doLogout()">Sign out</button></div>
-    <div style="text-align:center;color:var(--muted);font-size:11px;margin-top:8px">Future Makers v2 · Build D4.3</div>`;
+    <div style="text-align:center;color:var(--muted);font-size:11px;margin-top:8px">Future Makers v2 · Build D5.0</div>`;
   pingHealth();
 }
 // D4.2 — the diagnostic that ends "is it me or the server?" forever.
@@ -1000,6 +1001,16 @@ function wireMic(){
 function ensureRealtime(){
   if(S.chat.sub) return; S.chat.sub = true;
   sb.channel('fm-chat')
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'fm_meetings'}, payload => {
+      if(payload.new?.created_by!==S.profile.id) toast('📅 You are invited: '+(payload.new?.title||'a meeting'), 5000);
+      if(S.page==='meetings') renderMeetings();
+    })
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'fm_meetings'}, payload => {
+      if(payload.new?.status==='live' && payload.old?.status!=='live'){
+        toast('📅 Live now: '+(payload.new?.title||'meeting')+' — join from Meetings', 6000);
+      }
+      if(S.page==='meetings') renderMeetings();
+    })
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'fm_task_events'}, payload => {
       const k = payload.new?.kind;
       if(k==='activated' && payload.new?.actor_id!==S.profile.id) toast('✅ A task step is waiting');
@@ -1273,6 +1284,140 @@ async function openReport(id){
     </tbody></table></div>`);
 }
 
+
+// ---------------- MEETINGS (Stage D5.0 — Jitsi now, Google Meet in D5.1) ----------------
+function mtWhen(iso){
+  const d = new Date(iso), now = Date.now(), diff = d - now;
+  const t = d.toLocaleString('en-IN',{ day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+  if (diff <= 0) return t;
+  const m = Math.round(diff/60000);
+  if (m < 60) return `${t} · in ${m} min`;
+  if (m < 24*60) return `${t} · in ${Math.round(m/60)} h`;
+  return t;
+}
+const mtStatus = m => m.status==='live'
+  ? `<span class="pill on" style="background:var(--accent);border-color:var(--accent);color:#fff">● LIVE</span>`
+  : m.status==='cancelled' ? `<span class="pill off">Cancelled</span>`
+  : m.status==='ended' ? `<span class="pill" style="background:rgba(0,0,0,0.05);color:var(--muted)">Ended</span>`
+  : `<span class="pill on">Scheduled</span>`;
+
+async function renderMeetings(){
+  const main = document.getElementById('main');
+  const canSchedule = S.features?.meetings_schedule;
+  main.innerHTML = `
+    <div class="h1">Meetings</div>
+    <div class="row" style="margin-bottom:12px">
+      <button class="btn ${S.mt?.view!=='past'?'g':''}" onclick="S.mt={view:'up'};renderMeetings()">Upcoming</button>
+      <button class="btn ${S.mt?.view==='past'?'g':''}" onclick="S.mt={view:'past'};renderMeetings()">Past</button>
+      ${canSchedule?`<button class="btn p" style="margin-left:auto" onclick="openMeetingBuilder()">+ Schedule meeting</button>`:''}
+    </div>
+    <div id="mt-body"><div class="card">Loading…</div></div>`;
+  try {
+    const when = S.mt?.view==='past' ? 'past' : 'upcoming';
+    const j = await api('/api/fm/meetings?when='+when);
+    const el = document.getElementById('mt-body'); if(!el) return;
+    const list = j.meetings||[];
+    if(!list.length){ el.innerHTML = `<div class="card" style="text-align:center;color:var(--muted)">${when==='past'?'No past meetings yet.':'Nothing scheduled. '+(canSchedule?'Put one on the calendar.':'')}</div>`; return; }
+    el.innerHTML = list.map(m => {
+      const soon = m.status==='scheduled' && (new Date(m.scheduled_at)-Date.now()) <= 10*60*1000;
+      const joinable = m.status==='live' || soon;
+      return `<div class="card" style="position:relative;overflow:hidden">
+        ${m.status==='live'?`<span style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--accent)"></span>`:''}
+        <div class="row" style="align-items:flex-start">
+          <div style="flex:1;min-width:0">
+            <div class="row" style="gap:8px">${mtStatus(m)}<b style="font-size:14.5px">${esc(m.title)}</b></div>
+            <div style="font-size:12.5px;color:var(--muted);margin-top:5px">🕐 ${mtWhen(m.scheduled_at)} · ${m.duration_min} min · 👥 ${m.participant_count} · by ${esc(m.fm_users?.name||'—')}</div>
+            ${m.description?`<div style="font-size:12.5px;margin-top:5px">${esc(m.description)}</div>`:''}
+          </div>
+          <div class="row" style="gap:6px;flex:none">
+            ${joinable && m.status!=='cancelled' && m.status!=='ended' ? `<button class="btn sm p" onclick="mtJoin('${m.id}')">▶ Join</button>` : ''}
+            ${(m.created_by===S.profile.id||isAdmin()) && ['scheduled','live'].includes(m.status) ? `<button class="btn sm danger" onclick="mtCancel('${m.id}')">Cancel</button>` : ''}
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e){
+    const el = document.getElementById('mt-body');
+    if(el) el.innerHTML = `<div class="card">⚠ ${esc(e.message)}</div>`;
+  }
+}
+
+async function openMeetingBuilder(){
+  let users = [];
+  try { users = (await api('/api/fm/meetings/pickers')).users.filter(u=>u.id!==S.profile.id); }
+  catch(e){ toast('⚠ '+e.message); return; }
+  modal(`
+    <div class="m-h"><b>Schedule meeting</b><button class="m-x" onclick="closeModal()">✕</button></div>
+    <label class="lbl">Title</label>
+    <input id="mt-title" class="inp" placeholder="e.g. Daily ops sync"/>
+    <label class="lbl">Agenda (optional)</label>
+    <input id="mt-desc" class="inp" placeholder="What is this about?"/>
+    <div class="row">
+      <div style="flex:2;min-width:170px"><label class="lbl">Date & time</label><input id="mt-at" class="inp" type="datetime-local"/></div>
+      <div style="flex:1;min-width:110px"><label class="lbl">Duration</label>
+        <select id="mt-dur" class="inp"><option value="15">15 min</option><option value="30" selected>30 min</option><option value="45">45 min</option><option value="60">1 hour</option><option value="90">1.5 hours</option></select></div>
+    </div>
+    <label class="lbl">Participants</label>
+    <div style="max-height:190px;overflow-y:auto;border:1.5px solid var(--line);border-radius:10px;padding:4px 10px">
+      ${users.map(u=>`<label class="chk"><input type="checkbox" class="mt-p" value="${u.id}"/> ${esc(u.name)} <span style="color:var(--muted);font-size:11px">${esc(u.code)}</span></label>`).join('')||'<div style="padding:8px;color:var(--muted);font-size:13px">No other active users yet.</div>'}
+    </div>
+    <div id="mt-err" style="display:none;margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--danger-dim);border:1px solid rgba(229,57,53,0.25);color:var(--danger);font-size:13px;font-weight:700"></div>
+    <div class="row" style="margin-top:14px;justify-content:flex-end">
+      <button class="btn p" id="mt-go" onclick="mtCreate()">Schedule</button>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:10px">Everyone gets an email reminder 10 minutes before, and a live alert in the app. Video runs on a private Jitsi room — nothing to install, opens in the browser.</div>`);
+}
+
+function mtErr(m){
+  const el = document.getElementById('mt-err');
+  if(el){ el.textContent='⚠ '+m; el.style.display='block'; }
+  toast('⚠ '+m, 5000);
+}
+
+async function mtCreate(){
+  const errBox = document.getElementById('mt-err'); if(errBox) errBox.style.display='none';
+  const title = document.getElementById('mt-title').value.trim();
+  if(!title){ mtErr('Give the meeting a title'); return; }
+  const atEl = document.getElementById('mt-at');
+  const at = atEl?.value;
+  if(!at || isNaN(new Date(at))){
+    if(atEl){ atEl.style.borderColor='var(--stop)'; atEl.focus(); atEl.onchange=()=>{ atEl.style.borderColor=''; }; }
+    mtErr('Pick the date & time — tap the calendar icon in the field');
+    return;
+  }
+  const go = document.getElementById('mt-go');
+  if(go){ go.disabled=true; go.textContent='Scheduling…'; }
+  try {
+    await api('/api/fm/meetings', { method:'POST', body:{
+      title,
+      description: document.getElementById('mt-desc').value.trim()||null,
+      scheduled_at: new Date(at).toISOString(),
+      duration_min: Number(document.getElementById('mt-dur').value),
+      participants: [...document.querySelectorAll('.mt-p:checked')].map(x=>x.value),
+    }});
+    closeModal(); toast('📅 Meeting scheduled ✔');
+    S.mt = { view:'up' }; if(S.page==='meetings') renderMeetings(); else go2Meetings();
+  } catch(e){
+    mtErr(e.message);
+    if(go){ go.disabled=false; go.textContent='Schedule'; }
+  }
+}
+function go2Meetings(){ go('meetings'); }
+
+async function mtJoin(id){
+  try {
+    const j = await api('/api/fm/meetings/'+id+'/join', { method:'POST' });
+    const w = window.open(j.url, '_blank');
+    if(!w) toast('⚠ Pop-up blocked — allow pop-ups for this site and press Join again', 6000);
+    else toast('▶ Joining '+j.title);
+  } catch(e){ toast('⚠ '+e.message, 5000); }
+}
+
+async function mtCancel(id){
+  if(!confirm('Cancel this meeting for everyone?')) return;
+  try { await api('/api/fm/meetings/'+id+'/cancel', { method:'POST' }); toast('Meeting cancelled'); renderMeetings(); }
+  catch(e){ toast('⚠ '+e.message, 5000); }
+}
 
 // ---------------- TASKS (Stage D4.0 — the WatchOwl port) ----------------
 const TK_PRI = { critical:['CRITICAL','var(--stop)'], high:['High','var(--signal)'], normal:['Normal','var(--muted)'], low:['Low','#8696A0'] };
