@@ -3,40 +3,44 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-<meta name="theme-color" content="#14181D"/>
+<meta name="theme-color" content="#008069"/>
 <title>Future Makers</title>
 <link rel="manifest" href="manifest.json"/>
 <link rel="icon" href="icon-192.png"/>
 <link rel="apple-touch-icon" href="icon-192.png"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700;9..40,800&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
 <style>
 :root{
-  --ink:#14181D; --paper:#F6F4EA; --signal:#D65A1E; --go:#1F7A4D; --stop:#B13636;
-  --card:#fff; --line:#e6e2d6; --muted:#6b7078; --lgo:#e7f3ec;
+  --ink:#111B21; --paper:#ECE5DD; --bar:#008069; --signal:#008069; --go:#1FA855; --stop:#B13636; --fab:#25D366;
+  --card:#fff; --line:#E9EDEF; --muted:#667781; --lgo:#D9FDD3;
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
-body{margin:0;background:var(--paper);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:15px}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:'DM Sans',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:15px}
+.h1,.h2,.lg-h,.lg-brand,.topbar .nm,.cv-t,.tile .t,.m-h b{font-family:'Nunito','DM Sans',sans-serif}
 button{font-family:inherit;cursor:pointer}
 input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink)}
 .hide{display:none!important}
 /* ---------- login ---------- */
 #login{min-height:100vh;display:flex;flex-direction:column}
-.lg-top{background:var(--ink);color:#fff;padding:44px 24px 34px;display:flex;flex-direction:column;gap:14px}
+.lg-top{background:var(--bar);color:#fff;padding:44px 24px 34px;display:flex;flex-direction:column;gap:14px}
 .lg-brand{display:flex;align-items:center;gap:12px;font-weight:800;font-size:21px;letter-spacing:.2px}
 .lg-h{font-size:26px;font-weight:800;line-height:1.25;margin-top:8px}
-.lg-sub{color:#c9cdd4;font-size:14px;line-height:1.5}
+.lg-sub{color:#CDE9E2;font-size:14px;line-height:1.5}
 .lg-form{flex:1;padding:28px 24px;max-width:430px;width:100%;margin:0 auto}
 .lg-lbl{font-size:12.5px;color:var(--muted);font-weight:700;letter-spacing:.4px;text-transform:uppercase;margin:14px 0 6px}
 .lg-inp{width:100%;padding:13px 14px;border-radius:12px;border:1.5px solid var(--line);background:#fff;font-size:16px}
 .lg-inp:focus{outline:none;border-color:var(--signal)}
-.lg-btn{width:100%;margin-top:22px;padding:14px;border:none;border-radius:12px;background:var(--signal);color:#fff;font-weight:800;font-size:16px;box-shadow:0 8px 24px rgba(214,90,30,.35)}
+.lg-btn{width:100%;margin-top:22px;padding:14px;border:none;border-radius:12px;background:var(--signal);color:#fff;font-weight:800;font-size:16px;box-shadow:0 8px 24px rgba(0,128,105,.35)}
 .lg-err{margin-top:12px;color:var(--stop);font-size:13.5px;font-weight:600}
 /* ---------- shell ---------- */
 #shell{min-height:100vh;display:flex;flex-direction:column}
-.topbar{background:var(--ink);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:20}
+.topbar{background:var(--bar);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:20}
 .topbar .nm{font-weight:800;font-size:16px}
-.topbar .who{margin-left:auto;text-align:right;font-size:11.5px;color:#c9cdd4;line-height:1.3}
+.topbar .who{margin-left:auto;text-align:right;font-size:11.5px;color:#CDE9E2;line-height:1.3}
 .role-tag{display:inline-block;background:var(--signal);color:#fff;border-radius:6px;padding:1px 7px;font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase}
 .main{flex:1;padding:16px;max-width:960px;width:100%;margin:0 auto;padding-bottom:86px}
 .tabs{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);display:flex;z-index:20;padding-bottom:env(safe-area-inset-bottom)}
@@ -56,7 +60,7 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink)}
 .inp{padding:10px 12px;border-radius:10px;border:1.5px solid var(--line);background:#fff;width:100%}
 .lbl{font-size:11.5px;color:var(--muted);font-weight:700;letter-spacing:.3px;text-transform:uppercase;margin:10px 0 4px;display:block}
 table{width:100%;border-collapse:collapse;font-size:13px}
-th{text-align:left;padding:8px;background:#faf8f0;color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap}
+th{text-align:left;padding:8px;background:#F0F2F5;color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap}
 td{padding:8px;border-top:1px solid var(--line);vertical-align:middle}
 .pill{display:inline-block;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700}
 .pill.on{background:var(--lgo);color:var(--go)} .pill.off{background:#f6e3e3;color:var(--stop)}
@@ -67,7 +71,7 @@ td{padding:8px;border-top:1px solid var(--line);vertical-align:middle}
 .tile .s{font-size:11.5px;color:var(--muted);margin-top:3px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .soon{opacity:.55}
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:92px;background:var(--ink);color:#fff;padding:10px 18px;border-radius:12px;font-size:13.5px;font-weight:600;z-index:60;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:92px;background:var(--bar);color:#fff;padding:10px 18px;border-radius:12px;font-size:13.5px;font-weight:600;z-index:60;box-shadow:0 10px 30px rgba(0,0,0,.3)}
 /* ---------- chat ---------- */
 .cl-item{display:flex;gap:12px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:8px;cursor:pointer}
 .cl-av{width:44px;height:44px;border-radius:50%;background:var(--go);color:#fff;display:grid;place-items:center;font-weight:800;font-size:16px;flex:none}
@@ -79,32 +83,32 @@ td{padding:8px;border-top:1px solid var(--line);vertical-align:middle}
 .cl-time{font-size:11px;color:var(--muted)}
 .cl-badge{background:var(--go);color:#fff;border-radius:12px;font-size:11px;font-weight:800;padding:1px 7px;display:inline-block;margin-top:4px}
 #conv{position:fixed;inset:0;background:var(--paper);z-index:30;display:flex;flex-direction:column}
-.cv-head{background:var(--ink);color:#fff;padding:10px 12px;display:flex;align-items:center;gap:10px}
+.cv-head{background:var(--bar);color:#fff;padding:10px 12px;display:flex;align-items:center;gap:10px}
 .cv-back{border:none;background:none;color:#fff;font-size:22px;padding:2px 6px}
 .cv-t{font-weight:800;font-size:15px}
-.cv-s{font-size:11px;color:#c9cdd4}
+.cv-s{font-size:11px;color:#CDE9E2}
 .cv-msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:6px}
 .bub{max-width:78%;padding:8px 11px;border-radius:14px;font-size:14px;line-height:1.4;position:relative;word-wrap:break-word}
-.bub.me{align-self:flex-end;background:#fde8dc;border:1px solid #f3cdb8;border-bottom-right-radius:4px}
+.bub.me{align-self:flex-end;background:#D9FDD3;border:1px solid #C7EBC0;border-bottom-right-radius:4px}
 .bub.them{align-self:flex-start;background:#fff;border:1px solid var(--line);border-bottom-left-radius:4px}
-.bub.sys{align-self:center;background:#efece0;color:var(--muted);font-size:11.5px;border-radius:10px;padding:4px 12px}
+.bub.sys{align-self:center;background:#FCF4CB;color:#54656F;font-size:11.5px;border-radius:10px;padding:4px 12px}
 .bub .snd{font-size:11px;font-weight:800;color:var(--go);margin-bottom:2px}
 .bub .meta{font-size:10px;color:var(--muted);text-align:right;margin-top:3px;display:flex;gap:4px;justify-content:flex-end;align-items:center}
-.tick{font-size:11px}.tick.read{color:var(--go);font-weight:800}
+.tick{font-size:11px}.tick.read{color:#53BDEB;font-weight:800}
 .bub img{max-width:100%;border-radius:10px;display:block}
 .bub audio{width:210px;max-width:100%}
-.doccard{display:flex;gap:8px;align-items:center;background:#faf8f0;border:1px solid var(--line);border-radius:10px;padding:8px 10px;cursor:pointer}
+.doccard{display:flex;gap:8px;align-items:center;background:#F0F2F5;border:1px solid var(--line);border-radius:10px;padding:8px 10px;cursor:pointer}
 .cv-comp{background:#fff;border-top:1px solid var(--line);padding:8px 10px calc(8px + env(safe-area-inset-bottom));display:flex;gap:8px;align-items:flex-end}
 .cv-inp{flex:1;border:1.5px solid var(--line);border-radius:20px;padding:10px 14px;font-size:15px;max-height:110px;resize:none}
 .cv-btn{width:44px;height:44px;border-radius:50%;border:none;font-size:19px;flex:none;display:grid;place-items:center}
 .cv-send{background:var(--signal);color:#fff}
-.cv-attach{background:#f1eee4}
+.cv-attach{background:#F0F2F5}
 .cv-mic{background:var(--go);color:#fff}
 .cv-mic.rec{background:var(--stop);animation:pulse 1s infinite}
 @keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.12)}100%{transform:scale(1)}}
 .attach-menu{position:absolute;bottom:64px;left:10px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 30px rgba(0,0,0,.15);overflow:hidden;z-index:35}
 .attach-menu button{display:flex;gap:10px;align-items:center;width:100%;border:none;background:none;padding:12px 18px;font-size:14px;font-weight:600}
-.fab{position:fixed;right:18px;bottom:86px;width:56px;height:56px;border-radius:50%;border:none;background:var(--signal);color:#fff;font-size:26px;box-shadow:0 10px 26px rgba(214,90,30,.4);z-index:25}
+.fab{position:fixed;right:18px;bottom:86px;width:56px;height:56px;border-radius:50%;border:none;background:var(--fab);color:#fff;font-size:26px;box-shadow:0 10px 26px rgba(37,211,102,.45);z-index:25}
 /* ---------- camera & preview ---------- */
 #cam-live{width:100%;max-height:52vh;background:#000;border-radius:12px}
 .cam-bar{display:flex;justify-content:center;gap:18px;margin-top:12px}
@@ -112,16 +116,16 @@ td{padding:8px;border-top:1px solid var(--line);vertical-align:middle}
 .cam-shutter.rec{background:var(--stop);animation:pulse 1s infinite}
 .pv-media img,.pv-media video{width:100%;max-height:48vh;border-radius:12px;object-fit:contain;background:#000}
 /* ---------- modal ---------- */
-.overlay{position:fixed;inset:0;background:rgba(20,24,29,.5);z-index:40;display:flex;align-items:flex-end;justify-content:center}
+.overlay{position:fixed;inset:0;background:rgba(17,27,33,.5);z-index:40;display:flex;align-items:flex-end;justify-content:center}
 @media(min-width:640px){.overlay{align-items:center}}
 .modal{background:#fff;border-radius:18px 18px 0 0;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;padding:18px}
 @media(min-width:640px){.modal{border-radius:18px}}
 .m-h{display:flex;align-items:center;margin-bottom:10px}
 .m-h b{font-size:16px}
 .m-x{margin-left:auto;border:none;background:none;font-size:22px;color:var(--muted)}
-.chk{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #f1eee4;font-size:13.5px}
+.chk{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #F0F2F5;font-size:13.5px}
 .chk input{width:18px;height:18px;accent-color:var(--go)}
-.switchrow{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f1eee4}
+.switchrow{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F0F2F5}
 </style>
 </head>
 <body>
@@ -140,7 +144,7 @@ td{padding:8px;border-top:1px solid var(--line);vertical-align:middle}
     <input id="lg-pass" class="lg-inp" type="password" autocomplete="current-password" placeholder="Your password" onkeydown="if(event.key==='Enter')doLogin()"/>
     <button class="lg-btn" onclick="doLogin()">Sign in</button>
     <div id="lg-err" class="lg-err"></div>
-    <div style="text-align:center;color:#9aa0a8;font-size:11px;margin-top:18px">Build D4.0</div>
+    <div style="text-align:center;color:#8696A0;font-size:11px;margin-top:18px">Build D4.2</div>
   </div>
 </div>
 
@@ -160,7 +164,7 @@ td{padding:8px;border-top:1px solid var(--line);vertical-align:middle}
 const API = window.FM_CONFIG.API_BASE;
 const sb = supabase.createClient(window.FM_CONFIG.SUPABASE_URL, window.FM_CONFIG.SUPABASE_ANON_KEY);
 const FM_MARK = (size=34, opts={}) => {
-  const { tile=true, glyph='#fff', tileColor='#D65A1E' } = opts;
+  const { tile=true, glyph='#fff', tileColor='#008069' } = opts;
   const inner = `<svg width="${Math.round(size*0.62)}" height="${Math.round(size*0.62)}" viewBox="0 0 28 28" fill="none" style="display:block">
     <circle cx="9" cy="14" r="3.2" fill="${tile?glyph:tileColor}"/>
     <path d="M14.5 8 a8 8 0 0 1 0 12" stroke="${tile?glyph:tileColor}" stroke-width="2.6" fill="none" stroke-linecap="round"/>
@@ -172,9 +176,9 @@ const FM_MARK = (size=34, opts={}) => {
 document.getElementById('lg-mark').innerHTML = FM_MARK(40);
 document.getElementById('tb-mark').innerHTML = FM_MARK(30);
 
-let S = { profile:null, features:{}, page:'home', users:[], depts:[], matrix:null, tk:{ view:'mine', pick:null, steps:[] } };
+let S = { profile:null, features:{}, page:'home', users:[], depts:[], matrix:null, tk:{ view:'mine', pick:null, steps:[], filter:null, scoreDays:30 } };
 const esc = s => String(s??'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function toast(m){ const t=document.createElement('div'); t.className='toast'; t.textContent=m; document.body.appendChild(t); setTimeout(()=>t.remove(),2600); }
+function toast(m, ms){ const t=document.createElement('div'); t.className='toast'; t.textContent=m; document.body.appendChild(t); setTimeout(()=>t.remove(), ms || (String(m).startsWith('⚠')?4500:2600)); }
 
 async function token(){ const { data } = await sb.auth.getSession(); return data?.session?.access_token || null; }
 async function api(path, opts={}){
@@ -182,9 +186,24 @@ async function api(path, opts={}){
   const headers = { ...(opts.headers||{}) };
   if (!(opts.body instanceof FormData)) headers['Content-Type']='application/json';
   if (t) headers['Authorization'] = 'Bearer '+t;
-  const res = await fetch(API+path, { ...opts, headers, body: opts.body instanceof FormData ? opts.body : (opts.body ? JSON.stringify(opts.body) : undefined) });
+  // D4.2: a sleeping free-tier server used to mean an infinite silent
+  // hang. Now every call has a deadline and a message that says what
+  // is actually happening.
+  const ctrl = new AbortController();
+  const killer = setTimeout(()=>ctrl.abort(), opts.timeoutMs || 30000);
+  let res;
+  try {
+    res = await fetch(API+path, { ...opts, headers, signal: ctrl.signal,
+      body: opts.body instanceof FormData ? opts.body : (opts.body ? JSON.stringify(opts.body) : undefined) });
+  } catch(e){
+    clearTimeout(killer);
+    if (e.name === 'AbortError')
+      throw new Error('Server is waking up (free hosting sleeps when idle) — wait ~1 minute and try again');
+    throw new Error('Cannot reach the server — check your internet connection');
+  }
+  clearTimeout(killer);
   let j = {}; try { j = await res.json(); } catch {}
-  if (!res.ok) throw new Error(j.error || ('HTTP '+res.status));
+  if (!res.ok) throw new Error(j.error || ('Server error HTTP '+res.status));
   return j;
 }
 
@@ -194,14 +213,26 @@ async function doLogin(){
   const pass = document.getElementById('lg-pass').value;
   const err = document.getElementById('lg-err'); err.textContent='';
   if (!code || !pass) { err.textContent='Enter your code and password.'; return; }
+  const btn = document.querySelector('.lg-btn');
+  if (btn){ btn.disabled = true; btn.textContent = 'Signing in…'; }
+  const ctrl = new AbortController();
+  const killer = setTimeout(()=>ctrl.abort(), 30000);
   try {
-    const r = await fetch(API+'/api/fm/auth/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ code, password: pass }) });
+    const r = await fetch(API+'/api/fm/auth/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ code, password: pass }), signal: ctrl.signal });
+    clearTimeout(killer);
     const j = await r.json();
     if (!r.ok) { err.textContent = j.error || 'Login failed'; return; }
     await sb.auth.setSession({ access_token: j.session.access_token, refresh_token: j.session.refresh_token });
     S.profile = j.profile; S.features = j.features;
     enterApp();
-  } catch { err.textContent = 'Cannot reach server — check internet and try again.'; }
+  } catch(e){
+    clearTimeout(killer);
+    err.textContent = e.name==='AbortError'
+      ? 'The server is waking up (free hosting sleeps when idle). Wait ~1 minute, then try again.'
+      : 'Cannot reach server — check internet and try again.';
+  } finally {
+    if (btn){ btn.disabled = false; btn.textContent = 'Sign in'; }
+  }
 }
 async function tryResume(){
   const t = await token();
@@ -216,6 +247,7 @@ function enterApp(){
   document.getElementById('shell').classList.remove('hide');
   document.getElementById('tb-name').textContent = S.profile.name;
   document.getElementById('tb-role').textContent = S.profile.platform_role.replace('_',' ');
+  ensureRealtime();   // D4.1: was only wired on first Chat visit — SLA alerts need it from login
   renderTabs(); go('home');
 }
 
@@ -369,6 +401,10 @@ async function saveUser(id){
         body.features = features;
       }
       await api('/api/fm/users/'+id, { method:'PATCH', body });
+      // D4.1: task_role has its own authoritative endpoint (the D1
+      // users PATCH may whitelist it away — that was the Table Editor
+      // workaround). Same value both ways, so the double write is safe.
+      await api('/api/fm/tasks/roles/'+id, { method:'PUT', body:{ task_role: v('u-task')||null } });
       toast('Saved');
     }
     closeModal(); renderAdmin();
@@ -417,7 +453,7 @@ function openDept(id){
   modal(`
     <div class="m-h"><b>${d?'Edit department':'Add department'}</b><button class="m-x" onclick="closeModal()">×</button></div>
     <label class="lbl">Name</label><input id="d-name" class="inp" value="${esc(d?.name||'')}"/>
-    <label class="lbl">Color</label><input id="d-color" type="color" class="inp" style="height:44px;padding:4px" value="${d?.color||'#1F7A4D'}"/>
+    <label class="lbl">Color</label><input id="d-color" type="color" class="inp" style="height:44px;padding:4px" value="${d?.color||'#008069'}"/>
     <label class="lbl">SLA hours (WatchOwl)</label><input id="d-sla" class="inp" inputmode="decimal" value="${d?.sla_hours??4}"/>
     <div class="row" style="margin-top:14px;justify-content:flex-end">
       ${d&&S.profile.platform_role==='super_admin'?`<button class="btn danger" onclick="delDept(${d.id})">Delete</button>`:''}
@@ -468,8 +504,38 @@ function renderProfile(){
       <label class="lbl">New password</label><input id="cp-new" type="password" class="inp"/>
       <div class="row" style="margin-top:12px"><button class="btn p" onclick="changePass()">Update password</button></div>
     </div>
+    <div class="card">
+      <div class="h2">Server</div>
+      <div id="hc-line" style="font-size:13px;color:var(--muted)">Checking…</div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn sm" onclick="pingHealth()">🩺 Check again</button>
+        <span style="font-size:11px;color:var(--muted)">Free hosting sleeps after idle — the first request of the day can take up to a minute.</span>
+      </div>
+    </div>
     <div class="card"><button class="btn danger" style="width:100%" onclick="doLogout()">Sign out</button></div>
-    <div style="text-align:center;color:var(--muted);font-size:11px;margin-top:8px">Future Makers v2 · Build D4.0</div>`;
+    <div style="text-align:center;color:var(--muted);font-size:11px;margin-top:8px">Future Makers v2 · Build D4.2</div>`;
+  pingHealth();
+}
+// D4.2 — the diagnostic that ends "is it me or the server?" forever.
+async function pingHealth(){
+  const el = document.getElementById('hc-line'); if(!el) return;
+  el.textContent = 'Checking…';
+  const t0 = Date.now();
+  const ctrl = new AbortController();
+  const killer = setTimeout(()=>ctrl.abort(), 65000);
+  try {
+    const r = await fetch(API+'/health', { signal: ctrl.signal, cache:'no-store' });
+    clearTimeout(killer);
+    const ms = Date.now()-t0;
+    el.innerHTML = r.ok
+      ? `<b style="color:var(--go)">✅ Awake</b> · responded in ${ms<1000?ms+' ms':(ms/1000).toFixed(1)+' s'}${ms>5000?' <span style="color:var(--muted)">(it was asleep — it is warm now, retry whatever failed)</span>':''}`
+      : `<b style="color:var(--stop)">⚠ Reachable but unhealthy</b> · HTTP ${r.status} — check the Render logs`;
+  } catch(e){
+    clearTimeout(killer);
+    el.innerHTML = e.name==='AbortError'
+      ? `<b style="color:var(--stop)">⏳ No answer in 65 s</b> — the Render service looks down, not just asleep. Check the Render dashboard.`
+      : `<b style="color:var(--stop)">✘ Unreachable</b> — check your internet, then the Render dashboard.`;
+  }
 }
 async function changePass(){
   try {
@@ -814,6 +880,10 @@ function ensureRealtime(){
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'fm_task_events'}, payload => {
       const k = payload.new?.kind;
       if(k==='activated' && payload.new?.actor_id!==S.profile.id) toast('✅ A task step is waiting');
+      if(k==='escalated'){
+        const mine=(payload.new?.detail?.assignee_ids||[]).includes(S.profile.id);
+        toast(mine?'⏰ Your step is overdue — the task is blocked':'⏰ A task step went overdue', mine?6000:3000);
+      }
       if(S.page==='tasks'){
         if(S.tk.view==='mine') paintMine();
         else if(S.tk.view==='all') paintAllTasks();
@@ -899,7 +969,7 @@ async function paintManage(){
   try { const j = await api('/api/fm/broadcasts/manage'); S.bc.manage = j.broadcasts||[]; }
   catch(e){ document.getElementById('bc-body').innerHTML = `<div class="card">⚠ ${esc(e.message)}</div>`; return; }
   const el = document.getElementById('bc-body'); if(!el) return;
-  const chip = st => ({draft:'#889',scheduled:'#1a56b0',running:'#1F7A4D',done:'#667',paused:'#B13636'}[st]||'#889');
+  const chip = st => ({draft:'#889',scheduled:'#1a56b0',running:'#008069',done:'#667',paused:'#B13636'}[st]||'#889');
   el.innerHTML = S.bc.manage.length ? S.bc.manage.map(b=>`
     <div class="card">
       <div class="row" style="justify-content:space-between;align-items:flex-start">
@@ -961,6 +1031,7 @@ async function openComposer(){
       <option value="recur">🔁 Recurring</option>
     </select>
     <div id="bc-when" style="margin-top:8px"></div>
+    <div id="bc-err" style="display:none;margin-top:12px;padding:10px 12px;border-radius:10px;background:#FDECEC;border:1px solid #F1C4C4;color:var(--stop);font-size:13px;font-weight:700"></div>
     <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn p" id="bc-go" onclick="createBroadcast()">Create</button></div>`);
   bcModeUI();
 }
@@ -1003,9 +1074,18 @@ function bcPick(kind){
 bcPick.refresh = () => { const el=document.getElementById('bc-atts'); if(el) el.innerHTML = S.bc.atts.map((a,i)=>
   `<span class="btn sm">${a.kind==='image'?'🖼':a.kind==='video'?'🎥':'📄'} ${esc(a.name)} <b style="cursor:pointer" onclick="S.bc.atts.splice(${i},1);bcPick.refresh()">×</b></span>`).join(''); };
 
+// D4.2: failures used to be a 2.6-second toast that vanished behind a
+// busy thumb. Now every failure ALSO lands in a red box inside the
+// composer that stays until the next attempt.
+function bcErr(m){
+  const el = document.getElementById('bc-err');
+  if(el){ el.textContent = '⚠ ' + m; el.style.display = 'block'; }
+  toast('⚠ '+m, 5000);
+}
 async function createBroadcast(){
+  const errBox = document.getElementById('bc-err'); if(errBox) errBox.style.display='none';
   const t = document.getElementById('bc-title').value.trim();
-  if(!t){ toast('Give it a title'); return; }
+  if(!t){ bcErr('Give it a title'); return; }
   const tgt = document.getElementById('bc-target').value;
   let target_type='all', target_id=null, target_label='All employees';
   if(tgt!=='all'){ const [ty,id,...rest]=tgt.split(':'); target_type=ty; target_id=id; target_label=rest.join(':'); }
@@ -1019,8 +1099,15 @@ async function createBroadcast(){
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata',
   };
   if(mode==='schedule'){
-    const at = document.getElementById('bc-at').value;
-    if(!at){ toast('Pick date & time'); return; }
+    const atEl = document.getElementById('bc-at');
+    const at = atEl?.value;
+    // a datetime-local can LOOK filled while its value is empty
+    // (a half-committed segment). Make the failure visible and sticky.
+    if(!at || isNaN(new Date(at))){
+      if(atEl){ atEl.style.borderColor='var(--stop)'; atEl.focus(); atEl.onchange=()=>{ atEl.style.borderColor=''; }; }
+      bcErr('Pick the date & time — tap the calendar icon in the field');
+      return;
+    }
     body.next_run_at = new Date(at).toISOString();
   }
   if(mode==='recur'){
@@ -1036,7 +1123,7 @@ async function createBroadcast(){
     toast(mode==='now' ? ('Sent to '+(r.fired?.recipients??0)+' people 🚀') : 'Broadcast scheduled ✔');
     closeModal(); S.bc.view='manage'; renderBroadcast();
   } catch(e){
-    toast('⚠ '+e.message);
+    bcErr(e.message);
     if(go){ go.disabled = false; go.textContent = 'Create'; }
   }
 }
@@ -1065,7 +1152,7 @@ async function openReport(id){
 
 
 // ---------------- TASKS (Stage D4.0 — the WatchOwl port) ----------------
-const TK_PRI = { critical:['CRITICAL','var(--stop)'], high:['High','var(--signal)'], normal:['Normal','var(--muted)'], low:['Low','#9aa0a8'] };
+const TK_PRI = { critical:['CRITICAL','var(--stop)'], high:['High','var(--signal)'], normal:['Normal','var(--muted)'], low:['Low','#8696A0'] };
 const tkPri = p => { const [t,c]=TK_PRI[p]||TK_PRI.normal; return `<span style="font-size:11px;font-weight:800;color:${c}">${t}</span>`; };
 const tkDue = d => {
   if(!d) return '';
@@ -1076,7 +1163,8 @@ const tkDue = d => {
 };
 const tkStatus = st => ({active:'<span class="pill on">Active</span>',
   completed:'<span class="pill on" style="background:var(--go);border-color:var(--go)">Done</span>',
-  blocked:'<span class="pill off">Blocked</span>', cancelled:'<span class="pill off">Cancelled</span>',
+  blocked:'<span class="pill on" style="background:var(--stop);border-color:var(--stop)">⏰ Blocked</span>',
+  cancelled:'<span class="pill off">Cancelled</span>',
   draft:'<span class="pill off">Draft</span>'}[st]||esc(st));
 
 async function renderTasks(){
@@ -1087,10 +1175,13 @@ async function renderTasks(){
     <div class="row" style="margin-bottom:12px">
       <button class="btn ${S.tk.view==='mine'?'g':''}" onclick="S.tk.view='mine';renderTasks()">My steps</button>
       <button class="btn ${S.tk.view==='all'?'g':''}" onclick="S.tk.view='all';renderTasks()">All tasks</button>
+      <button class="btn ${S.tk.view==='score'?'g':''}" onclick="S.tk.view='score';renderTasks()">🏆 Scoreboard</button>
       ${canCreate?`<button class="btn p" style="margin-left:auto" onclick="openTaskBuilder()">+ New task</button>`:''}
     </div>
     <div id="tk-body"><div class="card">Loading…</div></div>`;
-  if(S.tk.view==='mine') await paintMine(); else await paintAllTasks();
+  if(S.tk.view==='mine') await paintMine();
+  else if(S.tk.view==='score') await paintScore();
+  else await paintAllTasks();
 }
 
 async function paintMine(){
@@ -1105,7 +1196,7 @@ async function paintMine(){
           <b style="font-size:15px">${esc(st.name)}</b>
           <div style="font-size:11.5px;color:var(--muted);margin-top:2px">
             <span style="font-family:ui-monospace,monospace">${esc(st.task.ref)}</span> · ${esc(st.task.title)} · ${tkPri(st.task.priority)}</div>
-          <div style="font-size:12px;margin-top:4px">${tkDue(st.due_at)}</div>
+          <div style="font-size:12px;margin-top:4px">${tkDue(st.due_at)}${st.escalated_at?` <span style="font-size:10px;font-weight:800;color:#fff;background:var(--stop);border-radius:4px;padding:1px 5px;vertical-align:1px">ESCALATED</span>`:''}</div>
         </div>
         <div class="row" style="gap:6px;flex:none">
           <button class="btn sm" onclick="openTask('${st.task_id}')">Open</button>
@@ -1123,7 +1214,7 @@ async function paintAllTasks(){
   const tasks = j.tasks||[];
   const fbtn = (v,l)=>`<button class="btn sm ${S.tk.filter===v?'g':''}" onclick="S.tk.filter=${v?`'${v}'`:'null'};paintAllTasks()">${l}</button>`;
   el.innerHTML = `<div class="row" style="margin-bottom:10px;flex-wrap:wrap;gap:6px">
-      ${fbtn(null,'All')}${fbtn('active','Active')}${fbtn('completed','Done')}${fbtn('cancelled','Cancelled')}</div>`
+      ${fbtn(null,'All')}${fbtn('active','Active')}${fbtn('blocked','⏰ Blocked')}${fbtn('completed','Done')}${fbtn('cancelled','Cancelled')}</div>`
     + (tasks.length ? tasks.map(t=>{
       const p=t.progress||{total:0,done:0};
       const pct = p.total? Math.round(p.done/p.total*100):0;
@@ -1139,12 +1230,57 @@ async function paintAllTasks(){
               ${p.done}/${p.total} steps${p.current?` · now: <b style="color:var(--ink)">${esc(p.current)}</b>`:''}</div>
           </div>
           <div style="flex:none;text-align:right">${tkStatus(t.status)}
-            <div style="width:86px;height:6px;background:rgba(20,24,29,.08);border-radius:4px;margin-top:8px;overflow:hidden">
+            <div style="width:86px;height:6px;background:rgba(17,27,33,.08);border-radius:4px;margin-top:8px;overflow:hidden">
               <div style="width:${pct}%;height:100%;background:${t.status==='completed'?'var(--go)':'var(--signal)'}"></div></div>
           </div>
         </div>
       </div>`;}).join('')
     : `<div class="card" style="text-align:center;color:var(--muted)">No tasks yet.</div>`);
+}
+
+// ----- scoreboard (D4.1) -----
+// Fixed formula for now: score = on-time% − 8×sent-back − 4×overdue-now,
+// clamped 0–100. A ≥90 · B ≥75 · C ≥60 · D below.
+async function paintScore(){
+  const d = S.tk.scoreDays||30;
+  let j; try { j = await api('/api/fm/tasks/scorecard?days='+d); }
+  catch(e){ const el=document.getElementById('tk-body'); if(el) el.innerHTML=`<div class="card">⚠ ${esc(e.message)}</div>`; return; }
+  const el = document.getElementById('tk-body'); if(!el) return;
+  const rows = j.rows||[];
+  const gCol = { A:'var(--go)', B:'var(--signal)', C:'var(--muted)', D:'var(--stop)' };
+  const win = v => `<button class="btn sm ${S.tk.scoreDays===v?'g':''}" onclick="S.tk.scoreDays=${v};paintScore()">${v}d</button>`;
+  el.innerHTML = `
+    <div class="row" style="margin-bottom:10px;gap:6px;flex-wrap:wrap">
+      ${win(7)}${win(30)}${win(90)}
+      <button class="btn sm" style="margin-left:auto" onclick="dlCsv('/api/fm/tasks/scorecard.csv?days=${d}','scorecard_${d}d.csv')">⬇ CSV</button>
+    </div>
+    ${rows.length?`<div class="card" style="padding:10px;overflow-x:auto">
+      <table><thead><tr><th>#</th><th>Name</th><th>Done</th><th>On-time</th><th>Sent back</th><th>Overdue now</th><th>Score</th></tr></thead>
+      <tbody>${rows.map((r,i)=>`
+        <tr>
+          <td style="font-family:ui-monospace,monospace">${i+1}</td>
+          <td><b>${esc(r.name)}</b> <span style="color:var(--muted);font-size:11px">${esc(r.code)}${r.task_role?' · '+esc(r.task_role):''}</span></td>
+          <td style="font-family:ui-monospace,monospace">${r.completed}</td>
+          <td style="font-family:ui-monospace,monospace">${r.on_time_pct==null?'—':r.on_time_pct+'%'}</td>
+          <td style="font-family:ui-monospace,monospace;${r.reversals?'color:var(--stop);font-weight:800':''}">${r.reversals}</td>
+          <td style="font-family:ui-monospace,monospace;${r.overdue_now?'color:var(--stop);font-weight:800':''}">${r.overdue_now}</td>
+          <td><b style="font-family:ui-monospace,monospace">${r.score}</b>
+            <span style="font-weight:800;color:${gCol[r.grade]||'var(--muted)'};margin-left:4px">${r.grade}</span></td>
+        </tr>`).join('')}</tbody></table>
+      <div style="font-size:10.5px;color:var(--muted);margin-top:8px">Last ${j.days} days · score = on-time% − 8×sent-back − 4×overdue now · avg completion ${rows.find(r=>r.avg_hours!=null)?'shown in CSV':'—'}</div>
+    </div>`:`<div class="card" style="text-align:center;color:var(--muted)">No task activity in the last ${j.days} days.</div>`}`;
+}
+
+// authenticated file download — a plain <a href> can't carry the Bearer token
+async function dlCsv(path, name){
+  try {
+    const t = await token();
+    const r = await fetch(API+path, { headers:{ Authorization:'Bearer '+t } });
+    if(!r.ok){ let j={}; try{ j=await r.json(); }catch{} throw new Error(j.error||('HTTP '+r.status)); }
+    const u = URL.createObjectURL(await r.blob());
+    const a = document.createElement('a'); a.href=u; a.download=name; a.click();
+    setTimeout(()=>URL.revokeObjectURL(u), 4000);
+  } catch(e){ toast('⚠ '+e.message, 5000); }
 }
 
 // ----- detail -----
@@ -1159,7 +1295,7 @@ async function openTask(id, refresh){
   const seqs=[...new Set(steps.map(x=>x.seq))].sort((a,b)=>a-b);
   const stepRow = st => {
     const mine = (st.assignees||[]).some(a=>a.id===me.id);
-    const col = st.status==='done'?'var(--go)':st.status==='active'?(st.due_at&&new Date(st.due_at)<Date.now()?'var(--stop)':'var(--signal)'):'#c9c4b4';
+    const col = st.status==='done'?'var(--go)':st.status==='active'?(st.due_at&&new Date(st.due_at)<Date.now()?'var(--stop)':'var(--signal)'):'#D1D7DB';
     return `<div class="row" style="gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid rgba(20,24,29,.06)">
       <div style="flex:none;width:12px;height:12px;border-radius:50%;background:${col};margin-top:4px"></div>
       <div style="min-width:0;flex:1">
@@ -1187,6 +1323,7 @@ async function openTask(id, refresh){
     <div class="row" style="margin-top:12px;gap:8px">
       ${canApprove?`<button class="btn p" onclick="tkApprove('${t.id}')">Approve task</button>`:''}
       ${canCancel?`<button class="btn" style="color:var(--stop)" onclick="tkCancel('${t.id}')">Cancel task</button>`:''}
+      <button class="btn sm" style="margin-left:auto" onclick="dlCsv('/api/fm/tasks/${t.id}/export.csv','${esc(t.ref)}_timeline.csv')">⬇ Timeline CSV</button>
     </div>
     <div class="h2" style="margin-top:14px">Timeline</div>
     <div style="max-height:180px;overflow:auto">
