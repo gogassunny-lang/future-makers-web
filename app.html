@@ -222,7 +222,7 @@ td{padding:8px;border-top:1px solid var(--line);vertical-align:middle}
     <input id="lg-pass" class="lg-inp" type="password" autocomplete="current-password" placeholder="Your password" onkeydown="if(event.key==='Enter')doLogin()"/>
     <button class="lg-btn" onclick="doLogin()">Sign in</button>
     <div id="lg-err" class="lg-err"></div>
-    <div style="text-align:center;color:#8696A0;font-size:11px;margin-top:18px">Build D5.0b</div>
+    <div style="text-align:center;color:#8696A0;font-size:11px;margin-top:18px">Build D5.0c</div>
   </div>
 </div>
 
@@ -639,7 +639,7 @@ function renderProfile(){
       </div>
     </div>
     <div class="card"><button class="btn danger" style="width:100%" onclick="doLogout()">Sign out</button></div>
-    <div style="text-align:center;color:var(--muted);font-size:11px;margin-top:8px">Future Makers v2 · Build D5.0b</div>`;
+    <div style="text-align:center;color:var(--muted);font-size:11px;margin-top:8px">Future Makers v2 · Build D5.0c</div>`;
   pingHealth();
 }
 // D4.2 — the diagnostic that ends "is it me or the server?" forever.
@@ -1062,6 +1062,7 @@ async function renderBroadcast(){
     ${canCreate?`<div class="row" style="margin-bottom:12px">
       <button class="btn ${S.bc.view==='inbox'?'g':''}" onclick="S.bc.view='inbox';renderBroadcast()">Inbox</button>
       <button class="btn ${S.bc.view==='manage'?'g':''}" onclick="S.bc.view='manage';renderBroadcast()">Manage</button>
+      <button class="btn sm" style="border-color:var(--accent2);color:var(--accent2)" onclick="bcDiag()">🩺 Run diagnostic</button>
       <button class="btn p" style="margin-left:auto" onclick="openComposer()">+ New broadcast</button>
     </div>`:''}
     <div id="bc-body"><div class="card">Loading…</div></div>`;
@@ -1213,12 +1214,89 @@ bcPick.refresh = () => { const el=document.getElementById('bc-atts'); if(el) el.
 // D4.2: failures used to be a 2.6-second toast that vanished behind a
 // busy thumb. Now every failure ALSO lands in a red box inside the
 // composer that stays until the next attempt.
+// ---------------- BROADCAST DIAGNOSTIC (D5.0c) ----------------
+// One click. Tests the whole pipeline and prints every step on
+// screen. Step 5 performs a REAL send-now broadcast (in-app only)
+// so a full pass literally proves the system by using it.
+async function bcDiag(){
+  modal(`<div class="m-h"><b>🩺 Broadcast diagnostic</b><button class="m-x" onclick="closeModal()">✕</button></div>
+    <div id="dg-out" style="font-family:ui-monospace,Consolas,monospace;font-size:13.5px;line-height:1.9"></div>
+    <div id="dg-verdict" style="margin-top:14px;padding:12px;border-radius:10px;font-weight:800;display:none"></div>`);
+  const out = document.getElementById('dg-out');
+  const line = (icon, txt) => { const d=document.createElement('div'); d.textContent = icon+' '+txt; out.appendChild(d); return d; };
+  const raw = (txt) => { const d=document.createElement('div'); d.style.cssText='background:var(--bg-input);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:2px 0 6px;word-break:break-all;white-space:pre-wrap;font-size:12px;color:var(--muted)'; d.textContent = txt; out.appendChild(d); };
+  const verdict = (ok, txt) => { const v=document.getElementById('dg-verdict'); if(!v) return; v.style.display='block'; v.style.background = ok?'var(--accent-dim)':'var(--danger-dim)'; v.style.color = ok?'var(--accent-dark)':'var(--danger)'; v.style.border = ok?'1px solid rgba(37,211,102,0.3)':'1px solid rgba(229,57,53,0.3)'; v.textContent = txt; };
+  const timed = (p, ms) => Promise.race([p, new Promise((_,rej)=>setTimeout(()=>rej(new Error('TIMED OUT after '+ms/1000+'s')), ms))]);
+
+  line('▪', 'API base: ' + API);
+
+  // 1 — server reachable, no auth
+  let l = line('⏳', 'Step 1 · server /health …');
+  try {
+    const t0=Date.now(); const r = await timed(fetch(API+'/health',{cache:'no-store'}), 65000);
+    l.textContent = (r.ok?'✔':'✘') + ` Step 1 · server /health → HTTP ${r.status} in ${Date.now()-t0} ms`;
+    if(!r.ok){ verdict(false,'FAILED AT STEP 1 — the server is not healthy. Check Render.'); return; }
+  } catch(e){ l.textContent='✘ Step 1 · server unreachable: '+e.message; verdict(false,'FAILED AT STEP 1 — cannot reach the server at all.'); return; }
+
+  // 2 — login token
+  l = line('⏳', 'Step 2 · your login token …');
+  let tok = null;
+  try {
+    tok = await timed(token(), 10000);
+    if(!tok){ l.textContent='✘ Step 2 · no login token — session is broken'; verdict(false,'FAILED AT STEP 2 — log out (Me → Sign out) and log in again, then re-run.'); return; }
+    l.textContent = '✔ Step 2 · login token present ('+String(tok).length+' chars)';
+  } catch(e){ l.textContent='✘ Step 2 · token retrieval '+e.message; verdict(false,'FAILED AT STEP 2 — the session refresh is stuck. Log out and log in again, then re-run.'); return; }
+  const H = { 'Authorization':'Bearer '+tok, 'Content-Type':'application/json' };
+
+  // 3 — the broadcasts route answers with auth
+  l = line('⏳', 'Step 3 · route GET /api/fm/broadcasts/manage …');
+  let existing = null;
+  try {
+    const r = await timed(fetch(API+'/api/fm/broadcasts/manage',{headers:H}), 30000);
+    const b = await r.text();
+    l.textContent = (r.ok?'✔':'✘') + ' Step 3 · manage list → HTTP ' + r.status;
+    if(!r.ok){ raw(b.slice(0,400)); verdict(false, r.status===404 ? 'FAILED AT STEP 3 — the broadcast route is MISSING on the server (backend deploy problem).' : 'FAILED AT STEP 3 — the server rejected your access. The raw answer above is the reason.'); return; }
+    try { existing = JSON.parse(b).broadcasts || []; } catch { existing = []; }
+    line('▪', '   → you already have ' + existing.length + ' broadcast(s) on the server' + (existing.length?': "'+ (existing[0].title||'?') +'" is the newest':''));
+  } catch(e){ l.textContent='✘ Step 3 · '+e.message; verdict(false,'FAILED AT STEP 3 — request died: '+e.message); return; }
+
+  // 4 — feature flags as this login sees them
+  line('▪', 'Step 4 · your features (login copy): broadcast_create='+(S.features.broadcast_create===true)+', broadcast_email='+(S.features.broadcast_email===true));
+
+  // 5 — the real thing: create a send-now, in-app-only broadcast
+  l = line('⏳', 'Step 5 · REAL create: POST /api/fm/broadcasts (send now, in-app only) …');
+  try {
+    const stamp = new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const r = await timed(fetch(API+'/api/fm/broadcasts',{ method:'POST', headers:H, body: JSON.stringify({
+      title:'DIAGNOSTIC '+stamp, body:'Automatic pipeline test — safe to ignore.', media:[],
+      target_type:'all', target_id:null, target_label:'All employees',
+      channels:{ inapp:true, email:false }, ack_required:false, send_mode:'now',
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata',
+    })}), 45000);
+    const b = await r.text();
+    l.textContent = (r.ok?'✔':'✘') + ' Step 5 · create → HTTP ' + r.status;
+    raw(b.slice(0,500));
+    if(!r.ok){ verdict(false,'FAILED AT STEP 5 — THIS IS THE BUG. The raw server answer above is the exact reason. Screenshot this card.'); return; }
+  } catch(e){ l.textContent='✘ Step 5 · '+e.message; verdict(false,'FAILED AT STEP 5 — request died mid-flight: '+e.message+'. Screenshot this card.'); return; }
+
+  // 6 — confirm it landed
+  l = line('⏳', 'Step 6 · re-checking the manage list …');
+  try {
+    const r = await timed(fetch(API+'/api/fm/broadcasts/manage',{headers:H}), 30000);
+    const j = await r.json(); const n = (j.broadcasts||[]).length;
+    l.textContent = '✔ Step 6 · server now has '+n+' broadcast(s)' + (existing!==null && n>existing.length ? ' — the new one LANDED':'');
+  } catch(e){ l.textContent='▪ Step 6 · recheck skipped: '+e.message; }
+
+  verdict(true,'ALL STEPS PASSED ✔ — a real broadcast was just created and sent in-app. The pipeline works end to end. Check the Inbox tab (and TEST01\'s screen) for "DIAGNOSTIC". Screenshot this card anyway.');
+}
+
 function bcErr(m){
   const el = document.getElementById('bc-err');
   if(el){ el.textContent = '⚠ ' + m; el.style.display = 'block'; }
   toast('⚠ '+m, 5000);
 }
 async function createBroadcast(){
+ try {
   const errBox = document.getElementById('bc-err'); if(errBox) errBox.style.display='none';
   const t = document.getElementById('bc-title').value.trim();
   if(!t){ bcErr('Give it a title'); return; }
@@ -1262,6 +1340,10 @@ async function createBroadcast(){
     bcErr(e.message);
     if(go){ go.disabled = false; go.textContent = 'Create'; }
   }
+ } catch(outer){
+  // impossible-by-design, but if ANYTHING above ever throws, it surfaces
+  bcErr('Unexpected: ' + outer.message);
+ }
 }
 
 // ----- report modal -----
