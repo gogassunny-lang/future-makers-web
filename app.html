@@ -222,7 +222,7 @@ td{padding:8px;border-top:1px solid var(--line);vertical-align:middle}
     <input id="lg-pass" class="lg-inp" type="password" autocomplete="current-password" placeholder="Your password" onkeydown="if(event.key==='Enter')doLogin()"/>
     <button class="lg-btn" onclick="doLogin()">Sign in</button>
     <div id="lg-err" class="lg-err"></div>
-    <div style="text-align:center;color:#8696A0;font-size:11px;margin-top:18px">Build D5.0c</div>
+    <div style="text-align:center;color:#8696A0;font-size:11px;margin-top:18px">Build D5.0d</div>
   </div>
 </div>
 
@@ -639,7 +639,7 @@ function renderProfile(){
       </div>
     </div>
     <div class="card"><button class="btn danger" style="width:100%" onclick="doLogout()">Sign out</button></div>
-    <div style="text-align:center;color:var(--muted);font-size:11px;margin-top:8px">Future Makers v2 · Build D5.0c</div>`;
+    <div style="text-align:center;color:var(--muted);font-size:11px;margin-top:8px">Future Makers v2 · Build D5.0d</div>`;
   pingHealth();
 }
 // D4.2 — the diagnostic that ends "is it me or the server?" forever.
@@ -1065,14 +1065,14 @@ async function renderBroadcast(){
       <button class="btn sm" style="border-color:var(--accent2);color:var(--accent2)" onclick="bcDiag()">🩺 Run diagnostic</button>
       <button class="btn p" style="margin-left:auto" onclick="openComposer()">+ New broadcast</button>
     </div>`:''}
-    <div id="bc-body"><div class="card">Loading…</div></div>`;
+    <div id="bc-list"><div class="card">Loading…</div></div>`;
   if(S.bc.view==='inbox') await paintInbox(); else await paintManage();
 }
 
 async function paintInbox(){
   try { const j = await api('/api/fm/broadcasts/inbox'); S.bc.inbox = j.inbox||[]; }
-  catch(e){ document.getElementById('bc-body').innerHTML = `<div class="card">⚠ ${esc(e.message)}</div>`; return; }
-  const el = document.getElementById('bc-body'); if(!el) return;
+  catch(e){ document.getElementById('bc-list').innerHTML = `<div class="card">⚠ ${esc(e.message)}</div>`; return; }
+  const el = document.getElementById('bc-list'); if(!el) return;
   el.innerHTML = S.bc.inbox.length ? S.bc.inbox.map(r=>{
     const b = r.fm_broadcasts||{};
     const media = Array.isArray(b.media)?b.media:[];
@@ -1104,8 +1104,8 @@ async function openBcMedia(path){
 
 async function paintManage(){
   try { const j = await api('/api/fm/broadcasts/manage'); S.bc.manage = j.broadcasts||[]; }
-  catch(e){ document.getElementById('bc-body').innerHTML = `<div class="card">⚠ ${esc(e.message)}</div>`; return; }
-  const el = document.getElementById('bc-body'); if(!el) return;
+  catch(e){ document.getElementById('bc-list').innerHTML = `<div class="card">⚠ ${esc(e.message)}</div>`; return; }
+  const el = document.getElementById('bc-list'); if(!el) return;
   const chip = st => ({draft:'#889',scheduled:'#1a56b0',running:'#128c4a',done:'#667',paused:'#B13636'}[st]||'#889');
   el.innerHTML = S.bc.manage.length ? S.bc.manage.map(b=>`
     <div class="card">
