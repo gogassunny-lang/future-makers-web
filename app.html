@@ -202,6 +202,8 @@ td{padding:8px;border-top:1px solid var(--line);vertical-align:middle}
 .chk{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--bg-secondary);font-size:13.5px}
 .chk input{width:18px;height:18px;accent-color:var(--accent)}
 .switchrow{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--bg-secondary)}
+/* D5.0b hotfix: bottom tabs are phones-only — re-assert after the base rule */
+@media(min-width:880px){.tabs{display:none}}
 </style>
 </head>
 <body>
@@ -220,7 +222,7 @@ td{padding:8px;border-top:1px solid var(--line);vertical-align:middle}
     <input id="lg-pass" class="lg-inp" type="password" autocomplete="current-password" placeholder="Your password" onkeydown="if(event.key==='Enter')doLogin()"/>
     <button class="lg-btn" onclick="doLogin()">Sign in</button>
     <div id="lg-err" class="lg-err"></div>
-    <div style="text-align:center;color:#8696A0;font-size:11px;margin-top:18px">Build D5.0</div>
+    <div style="text-align:center;color:#8696A0;font-size:11px;margin-top:18px">Build D5.0b</div>
   </div>
 </div>
 
@@ -637,7 +639,7 @@ function renderProfile(){
       </div>
     </div>
     <div class="card"><button class="btn danger" style="width:100%" onclick="doLogout()">Sign out</button></div>
-    <div style="text-align:center;color:var(--muted);font-size:11px;margin-top:8px">Future Makers v2 · Build D5.0</div>`;
+    <div style="text-align:center;color:var(--muted);font-size:11px;margin-top:8px">Future Makers v2 · Build D5.0b</div>`;
   pingHealth();
 }
 // D4.2 — the diagnostic that ends "is it me or the server?" forever.
