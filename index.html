@@ -1392,7 +1392,7 @@ function openWaModal(){
     <label class="field"><span>Campaign title (internal)</span><input class="input" id="wa_title" placeholder="Morning safety instruction"/></label>
     <label class="field"><span>Send to</span><select class="input" id="wa_ttype" onchange="waTargetChange()"><option value="group">A WhatsApp group</option><option value="person">A person</option></select></label>
     <div id="wa_target"></div>
-    <label class="field"><span>Video / file link (Google Drive or any URL) — optional</span><input class="input" id="wa_media" placeholder="https://drive.google.com/…"/></label>
+    <label class="field"><span>Video / file link (Google Drive or any URL) — optional, leave blank for a text-only message</span><input class="input" id="wa_media" placeholder="https://drive.google.com/…"/></label>
     <label class="field"><span>Caption / message</span><textarea class="input" id="wa_caption" rows="3" style="resize:vertical" placeholder="Good morning team! Today's targets attached."></textarea></label>
     <label class="field"><span>Assign to (who fires it) — optional</span><input class="input" id="wa_assign" placeholder="e.g. SG001 or 'Front desk tablet'"/></label>
     <label class="field"><span>When</span><select class="input" id="wa_mode"><option value="now">Now (put in the fire queue immediately)</option><option value="once">Once — pick date &amp; time</option><option value="recurring">Recurring</option></select></label>
@@ -1409,7 +1409,7 @@ function waTargetChange(){
   const t = document.getElementById('wa_ttype').value;
   const box = document.getElementById('wa_target'); if(!box) return;
   box.innerHTML = t==='person'
-    ? `<label class="field"><span>Person's name</span><input class="input" id="wa_tname" placeholder="Rakesh Sharma"/></label><label class="field"><span>Phone (with country code)</span><input class="input" id="wa_tnum" placeholder="+9198…"/></label>`
+    ? `<label class="field"><span>Person's name</span><input class="input" id="wa_tname" placeholder="Rakesh Sharma"/></label><label class="field"><span>Mobile number (India +91 — just the 10 digits)</span><input class="input" id="wa_tnum" placeholder="98765 43210" inputmode="numeric"/></label>`
     : `<label class="field"><span>Exact WhatsApp group name</span><input class="input" id="wa_tname" placeholder="GOGAS Field Team"/></label>`;
 }
 function waModeChange(){
@@ -1448,10 +1448,16 @@ async function waCreate(){
     assigned_to: document.getElementById('wa_assign').value.trim(),
     mode: document.getElementById('wa_mode').value,
   };
+  if(!payload.media_url && !payload.caption){ errEl.textContent='Add a message, a media link, or both.'; return; }
   if(target_type==='person'){
-    const num = document.getElementById('wa_tnum') ? document.getElementById('wa_tnum').value.trim() : '';
-    if(!num){ errEl.textContent='Enter the phone number for a person.'; return; }
-    payload.target_number = num;
+    const raw = document.getElementById('wa_tnum') ? document.getElementById('wa_tnum').value.trim() : '';
+    const digits = raw.replace(/\D/g,'');
+    let e164;
+    if(digits.length===10) e164='+91'+digits;
+    else if(digits.length===12 && digits.startsWith('91')) e164='+'+digits;
+    else if(digits.length===11 && digits.startsWith('0')) e164='+91'+digits.slice(1);
+    else { errEl.textContent='Enter a valid 10-digit Indian mobile number.'; return; }
+    payload.target_number = e164;
   }
   if(payload.mode==='once'){ const w=document.getElementById('wa_when').value; if(!w){ errEl.textContent='Pick a date & time.'; return; } payload.run_at=new Date(w).toISOString(); }
   else if(payload.mode==='recurring'){
