@@ -456,6 +456,7 @@ function renderShell(inner){
       ${navItem('campaigns','Campaigns')}
       ${navItem('lists','Broadcast Lists')}
       ${navItem('reports','Campaign Reports')}
+      ${navItem('email','Email Automation')}
       <div class="side-foot">
         <div class="who-row">
           <div class="who"><b>${esc(p.name||p.email||'User')}</b>${esc(p.email||'')}<br/><span class="role-tag">${esc((p.role||'user').replace('_',' '))}</span></div>
@@ -969,6 +970,184 @@ function openProfileModal(){
   };
 }
 
+// ---------- EMAIL AUTOMATION (Stage E1) ----------
+function emDate(iso){ return iso ? new Date(iso).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '—'; }
+
+async function renderEmail(){
+  renderShell(`<div class="page-head">
+    <div><div class="eyebrow">Automation</div><h2>Email Automation</h2><p>Send and schedule emails automatically from your own Gmail — one-time, once, or recurring. No device needed.</p></div>
+    <button class="btn" id="emNew" style="display:none">+ New email</button>
+  </div><div id="emArea"><div class="loading">Loading…</div></div>`);
+  const area = document.getElementById('emArea');
+  try {
+    const st = await api('/api/fm/email/google/status');
+    if(!st.connected){
+      area.innerHTML = `<div class="empty">
+        <h3>Connect a sending mailbox</h3>
+        <p>Authorize a Google account once. After that, scheduled emails send automatically as that address.</p>
+        <button class="btn" id="emConnect" style="margin-top:14px">🔗 Connect Google email</button>
+        <p style="margin-top:12px;font-size:12px;color:var(--ink-soft)">You'll see a one-time "unverified app" notice from Google — tap <b>Advanced → continue</b>, then Allow.</p>
+      </div>`;
+      document.getElementById('emConnect').onclick = emailConnect;
+      return;
+    }
+    const nb = document.getElementById('emNew'); nb.style.display=''; nb.onclick = openEmailModal;
+    const { campaigns } = await api('/api/fm/email');
+    renderEmailList(st, campaigns || []);
+  } catch(e){
+    area.innerHTML = `<div class="empty"><h3>Couldn't load</h3><p>${esc(e.message)}</p></div>`;
+  }
+}
+
+function renderEmailList(st, cs){
+  const area = document.getElementById('emArea');
+  const repeat = c => c.repeat_type==='none' ? 'One-time' : ({daily:'Daily',weekdays:'Weekdays',weekly:'Weekly',monthly:'Monthly'}[c.repeat_type]||c.repeat_type);
+  const pill = s => { const m={active:['opt-yes','Active'],paused:['opt-no','Paused'],stopped:['opt-no','Stopped'],done:['opt-no','Done']}; const [cls,txt]=m[s]||['opt-no',s]; return `<span class="opt-pill ${cls}"><span class="opt-dot"></span>${txt}</span>`; };
+  area.innerHTML = `
+    <div class="panel" style="padding:14px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:10px">
+      <div style="min-width:0"><div style="font-size:12px;color:var(--ink-soft)">Sending as</div>
+        <div style="font-weight:700;overflow:hidden;text-overflow:ellipsis">📧 ${esc(st.email)}</div></div>
+      <button class="btn sm ghost" id="emDisc">Disconnect</button>
+    </div>
+    ${cs.length ? `<div class="panel"><table><thead><tr><th>Subject</th><th>Schedule</th><th>Recipients</th><th>Status</th><th>Next / last</th><th></th></tr></thead><tbody>
+      ${cs.map(c=>`<tr>
+        <td><b>${esc(c.subject)}</b></td>
+        <td class="phone-cell">${repeat(c)}</td>
+        <td>${c.recipient_count}</td>
+        <td>${pill(c.status)}</td>
+        <td class="phone-cell">${c.next_run_at?'Next '+emDate(c.next_run_at):(c.last_run_at?'Last '+emDate(c.last_run_at):'—')}</td>
+        <td><div class="row-actions">
+          ${c.status==='active'?`<button class="btn sm ghost" data-empause="${c.id}">Pause</button>`:''}
+          ${c.status==='paused'?`<button class="btn sm" data-emresume="${c.id}">Resume</button>`:''}
+          ${['active','paused'].includes(c.status)?`<button class="btn sm danger" data-emstop="${c.id}">Stop</button>`:''}
+          <button class="btn sm ghost" data-emhist="${c.id}">History</button>
+        </div></td>
+      </tr>`).join('')}
+    </tbody></table></div>` : `<div class="empty"><h3>No automations yet</h3><p>Create your first email — send now, once, or on a recurring schedule.</p></div>`}
+    <div id="emHist"></div>`;
+  document.getElementById('emDisc').onclick = emailDisconnect;
+  document.querySelectorAll('[data-empause]').forEach(b=> b.onclick=()=>emailAction(b.dataset.empause,'pause'));
+  document.querySelectorAll('[data-emresume]').forEach(b=> b.onclick=()=>emailAction(b.dataset.emresume,'resume'));
+  document.querySelectorAll('[data-emstop]').forEach(b=> b.onclick=()=>emailAction(b.dataset.emstop,'stop'));
+  document.querySelectorAll('[data-emhist]').forEach(b=> b.onclick=()=>emailHistory(b.dataset.emhist));
+}
+
+async function emailConnect(){
+  try { const j = await api('/api/fm/email/google/connect',{method:'POST',json:{}}); window.location.href = j.url; }
+  catch(e){ toast(e.message,'bad'); }
+}
+
+function emailDisconnect(){
+  showModal(`<h3>Disconnect mailbox?</h3><p class="msub">Scheduled emails will stop sending until you reconnect.</p>
+    <div class="modal-actions"><button class="btn ghost" id="mc">Cancel</button><button class="btn danger" id="mok">Disconnect</button></div>`);
+  document.getElementById('mc').onclick = closeModal;
+  document.getElementById('mok').onclick = async ()=>{ try{ await api('/api/fm/email/google/disconnect',{method:'POST',json:{}}); closeModal(); toast('Disconnected','good'); renderEmail(); }catch(e){ toast(e.message,'bad'); } };
+}
+
+async function emailAction(id, act){
+  try { await api('/api/fm/email/'+id+'/'+act,{method:'POST',json:{}}); toast('Done','good'); renderEmail(); }
+  catch(e){ toast(e.message,'bad'); }
+}
+
+async function emailHistory(id){
+  const box = document.getElementById('emHist'); if(!box) return;
+  if(box.dataset.open===id){ box.innerHTML=''; box.dataset.open=''; return; }
+  box.dataset.open=id;
+  box.innerHTML = `<div class="loading">Loading history…</div>`;
+  try {
+    const { sends } = await api('/api/fm/email/'+id+'/sends');
+    box.innerHTML = `<div class="panel" style="margin-top:16px"><div style="padding:12px 16px;font-weight:700">Run history</div>`
+      + (sends.length
+          ? `<table><thead><tr><th>When</th><th>Sent</th><th>Failed</th><th>Note</th></tr></thead><tbody>`
+            + sends.map(s=>`<tr><td class="phone-cell">${emDate(s.run_at)}</td><td>${s.sent}/${s.recipient_count}</td><td>${s.failed||0}</td><td>${s.error?esc(s.error):'—'}</td></tr>`).join('')
+            + `</tbody></table>`
+          : `<div class="empty" style="padding:20px 16px"><p>No runs yet.</p></div>`)
+      + `</div>`;
+  } catch(e){ box.innerHTML = `<div class="empty"><p>${esc(e.message)}</p></div>`; }
+}
+
+function openEmailModal(){
+  showModal(`<h3>New email automation</h3><p class="msub">Sends automatically from your connected Gmail.</p>
+    <label class="field"><span>Subject</span><input class="input" id="em_subj" placeholder="Weekly update"/></label>
+    <label class="field"><span>Message — HTML allowed · use {{name}} for the recipient's name</span><textarea class="input" id="em_body" rows="4" style="resize:vertical" placeholder="Hello {{name}},&#10;&#10;..."></textarea></label>
+    <label class="field"><span>Recipients — one per line (email, or Name &lt;email&gt;)</span><textarea class="input" id="em_rcpts" rows="3" style="resize:vertical" placeholder="rakesh@example.com&#10;Priya Sharma &lt;priya@example.com&gt;"></textarea></label>
+    <label class="field"><span>When</span><select class="input" id="em_mode"><option value="now">Send now</option><option value="once">Send once — pick date &amp; time</option><option value="recurring">Recurring</option></select></label>
+    <div id="em_sched"></div>
+    <div class="err" id="em_err"></div>
+    <div class="modal-actions"><button class="btn ghost" id="mc">Cancel</button><button class="btn" id="mok">Schedule</button></div>`);
+  document.getElementById('mc').onclick = closeModal;
+  document.getElementById('em_mode').onchange = emailModeChange;
+  document.getElementById('mok').onclick = emailCreate;
+  emailModeChange();
+}
+
+function emailModeChange(){
+  const mode = document.getElementById('em_mode').value;
+  const s = document.getElementById('em_sched'); if(!s) return;
+  if(mode==='now'){ s.innerHTML=''; return; }
+  if(mode==='once'){ s.innerHTML = `<label class="field"><span>Date &amp; time (IST)</span><input class="input" id="em_when" type="datetime-local"/></label>`; return; }
+  s.innerHTML = `
+    <label class="field"><span>Repeat</span><select class="input" id="em_rt">
+      <option value="daily">Every day</option>
+      <option value="weekdays">Weekdays (Mon–Fri)</option>
+      <option value="weekly">Weekly — pick days</option>
+      <option value="monthly">Monthly — pick date</option>
+    </select></label>
+    <div id="em_rt_extra"></div>
+    <label class="field"><span>Time (IST)</span><input class="input" id="em_time" type="time" value="09:00"/></label>
+    <label class="field"><span>End date — optional (blank = until you stop it)</span><input class="input" id="em_end" type="date"/></label>`;
+  document.getElementById('em_rt').onchange = emailRepeatChange;
+  emailRepeatChange();
+}
+
+function emailRepeatChange(){
+  const rt = document.getElementById('em_rt').value;
+  const e = document.getElementById('em_rt_extra'); if(!e) return;
+  if(rt==='weekly'){
+    const d=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    e.innerHTML = `<label class="field"><span>Days</span><div style="display:flex;flex-wrap:wrap;gap:12px">`
+      + d.map((x,i)=>`<label style="display:flex;align-items:center;gap:5px;font-size:13px;font-weight:500"><input type="checkbox" class="em_day" value="${i}"/> ${x}</label>`).join('')
+      + `</div></label>`;
+  } else if(rt==='monthly'){
+    e.innerHTML = `<label class="field"><span>Day of month (1–28)</span><input class="input" id="em_dom" type="number" min="1" max="28" value="1"/></label>`;
+  } else e.innerHTML='';
+}
+
+async function emailCreate(){
+  const subject = document.getElementById('em_subj').value.trim();
+  const body_html = document.getElementById('em_body').value.trim();
+  const rraw = document.getElementById('em_rcpts').value.trim();
+  const errEl = document.getElementById('em_err');
+  if(!subject){ errEl.textContent='Subject is required.'; return; }
+  if(!body_html){ errEl.textContent='Message is required.'; return; }
+  const recipients = rraw.split(/\n+/).map(x=>x.trim()).filter(Boolean).map(line=>{
+    const m = line.match(/^(.*)<([^>]+)>$/);
+    return m ? { name:m[1].trim(), email:m[2].trim() } : { email:line };
+  }).filter(r=>r.email.includes('@'));
+  if(!recipients.length){ errEl.textContent='Add at least one valid recipient email.'; return; }
+  const mode = document.getElementById('em_mode').value;
+  const payload = { subject, body_html, recipients, mode };
+  if(mode==='once'){
+    const w = document.getElementById('em_when').value;
+    if(!w){ errEl.textContent='Pick a date & time.'; return; }
+    payload.run_at = new Date(w).toISOString();
+  } else if(mode==='recurring'){
+    payload.repeat_type = document.getElementById('em_rt').value;
+    payload.send_time = document.getElementById('em_time').value || '09:00';
+    const end = document.getElementById('em_end').value; if(end) payload.ends_on = end;
+    if(payload.repeat_type==='weekly'){
+      payload.repeat_days = [...document.querySelectorAll('.em_day:checked')].map(x=>+x.value);
+      if(!payload.repeat_days.length){ errEl.textContent='Pick at least one day.'; return; }
+    }
+    if(payload.repeat_type==='monthly'){ payload.repeat_dom = +document.getElementById('em_dom').value || 1; }
+  }
+  const btn = document.getElementById('mok'); btn.disabled=true; btn.textContent='Scheduling…';
+  try {
+    await api('/api/fm/email',{method:'POST',json:payload});
+    closeModal(); toast('Scheduled','good'); renderEmail();
+  } catch(e){ btn.disabled=false; btn.textContent='Schedule'; errEl.textContent=e.message; }
+}
+
 // ---------- ROUTER ----------
 function route(){
   switch(state.page){
@@ -976,6 +1155,7 @@ function route(){
     case 'instruction': renderInstruction(); break;
     case 'campaigns': renderCampaigns(); break;
     case 'reports': renderReports(); break;
+    case 'email': renderEmail(); break;
     default: renderLists();
   }
 }
@@ -997,6 +1177,19 @@ async function boot(){
     const { data: prof } = await sb.from('users').select('*').eq('id', state.user.id).single();
     state.profile = prof || { email: state.user.email, role: 'user', name: '' };
   } catch { state.profile = { email: state.user.email, role: 'user', name: '' }; }
+  // Returning from the Google email OAuth flow?
+  const h = location.hash || '';
+  if (h.includes('email=connected')){
+    const m = h.match(/addr=([^&]+)/);
+    toast('Email connected' + (m ? ': ' + decodeURIComponent(m[1]) : ''), 'good');
+    history.replaceState(null,'',location.pathname+location.search);
+    state.page='email'; route(); return;
+  }
+  if (h.includes('email=error')){
+    toast('Email connection failed — please try again', 'bad');
+    history.replaceState(null,'',location.pathname+location.search);
+    state.page='email'; route(); return;
+  }
   state.page='lists'; route();
 }
 boot();
