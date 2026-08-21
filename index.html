@@ -354,6 +354,13 @@
     .main { padding: 22px 18px; }
     .page-head { flex-direction: column; }
   }
+  .em-tobox{position:relative}
+  .em-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+  .em-chip{display:inline-flex;align-items:center;gap:6px;background:#f0e7df;color:#5a3410;border-radius:14px;padding:3px 10px;font-size:13px}
+  .em-chip b{cursor:pointer;font-weight:800;color:#a0561e}
+  .em-dd{position:absolute;left:0;right:0;top:100%;z-index:60;background:#fff;border:1px solid var(--line);border-radius:9px;box-shadow:0 8px 24px rgba(0,0,0,.12);max-height:220px;overflow:auto;margin-top:2px}
+  .em-opt{padding:9px 12px;cursor:pointer;font-size:13.5px;border-bottom:1px solid #f2ede8}
+  .em-opt:hover{background:#faf6f2}
 </style>
 </head>
 <body>
@@ -976,7 +983,10 @@ function emDate(iso){ return iso ? new Date(iso).toLocaleString('en-IN',{day:'2-
 async function renderEmail(){
   renderShell(`<div class="page-head">
     <div><div class="eyebrow">Automation</div><h2>Email Automation</h2><p>Send and schedule emails automatically from your own Gmail — one-time, once, or recurring. No device needed.</p></div>
-    <button class="btn" id="emNew" style="display:none">+ New email</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn ghost" id="emContacts" style="display:none">Contacts</button>
+      <button class="btn" id="emNew" style="display:none">+ New email</button>
+    </div>
   </div><div id="emArea"><div class="loading">Loading…</div></div>`);
   const area = document.getElementById('emArea');
   try {
@@ -992,6 +1002,7 @@ async function renderEmail(){
       return;
     }
     const nb = document.getElementById('emNew'); nb.style.display=''; nb.onclick = openEmailModal;
+    const cb = document.getElementById('emContacts'); if(cb){ cb.style.display=''; cb.onclick = openContactsModal; }
     const { campaigns } = await api('/api/fm/email');
     renderEmailList(st, campaigns || []);
   } catch(e){
@@ -1066,19 +1077,117 @@ async function emailHistory(id){
   } catch(e){ box.innerHTML = `<div class="empty"><p>${esc(e.message)}</p></div>`; }
 }
 
-function openEmailModal(){
+async function openEmailModal(){
+  state.emRcpts = [];
+  let lists = [];
+  try { const r = await api('/api/fm/email/lists'); lists = r.lists || []; } catch {}
   showModal(`<h3>New email automation</h3><p class="msub">Sends automatically from your connected Gmail.</p>
     <label class="field"><span>Subject</span><input class="input" id="em_subj" placeholder="Weekly update"/></label>
     <label class="field"><span>Message — HTML allowed · use {{name}} for the recipient's name</span><textarea class="input" id="em_body" rows="4" style="resize:vertical" placeholder="Hello {{name}},&#10;&#10;..."></textarea></label>
-    <label class="field"><span>Recipients — one per line (email, or Name &lt;email&gt;)</span><textarea class="input" id="em_rcpts" rows="3" style="resize:vertical" placeholder="rakesh@example.com&#10;Priya Sharma &lt;priya@example.com&gt;"></textarea></label>
+    <label class="field"><span>Recipients — search saved contacts, type an email, or pick a list</span>
+      <div class="em-tobox">
+        <div id="em_chips" class="em-chips"></div>
+        <input class="input" id="em_input" placeholder="Type a name or email, then Enter…" autocomplete="off"/>
+        <div id="em_dd" class="em-dd" style="display:none"></div>
+      </div>
+    </label>
+    ${lists.length ? `<label class="field"><span>Or add a saved list</span><select class="input" id="em_list"><option value="">— pick a list —</option>${lists.map(l=>`<option value="${l.id}">${esc(l.name)} (${l.member_count})</option>`).join('')}</select></label>` : ''}
     <label class="field"><span>When</span><select class="input" id="em_mode"><option value="now">Send now</option><option value="once">Send once — pick date &amp; time</option><option value="recurring">Recurring</option></select></label>
     <div id="em_sched"></div>
+    <label class="field"><span>Save these recipients as a list (optional)</span><input class="input" id="em_savelist" placeholder="e.g. Managers — leave blank to skip"/></label>
     <div class="err" id="em_err"></div>
     <div class="modal-actions"><button class="btn ghost" id="mc">Cancel</button><button class="btn" id="mok">Schedule</button></div>`);
+  state.emLists = lists;
   document.getElementById('mc').onclick = closeModal;
   document.getElementById('em_mode').onchange = emailModeChange;
   document.getElementById('mok').onclick = emailCreate;
+  const input = document.getElementById('em_input');
+  input.oninput = emOnType;
+  input.onkeydown = emOnKey;
+  const ls = document.getElementById('em_list');
+  if (ls) ls.onchange = () => emPickList(ls);
+  emRenderChips();
   emailModeChange();
+}
+
+// ----- Gmail-style recipient chips + autocomplete -----
+function emRenderChips(){
+  const box = document.getElementById('em_chips'); if(!box) return;
+  const rcpts = state.emRcpts || [];
+  box.innerHTML = rcpts.map((r,i)=>`<span class="em-chip">${esc(r.name?r.name+' · ':'')}${esc(r.email)} <b data-emrm="${i}">×</b></span>`).join('');
+  box.querySelectorAll('[data-emrm]').forEach(b=> b.onclick=()=>{ state.emRcpts.splice(+b.dataset.emrm,1); emRenderChips(); });
+}
+function emAddRecipient(r){
+  if(!r || !r.email || !r.email.includes('@')) return;
+  const em = r.email.trim().toLowerCase();
+  state.emRcpts = state.emRcpts || [];
+  if(state.emRcpts.some(x=>x.email.toLowerCase()===em)) return;
+  state.emRcpts.push({ name: r.name || null, email: r.email.trim() });
+  emRenderChips();
+}
+let emSearchTimer = null;
+function emOnType(e){
+  const q = e.target.value.trim();
+  const dd = document.getElementById('em_dd');
+  clearTimeout(emSearchTimer);
+  if(!q){ dd.style.display='none'; dd.innerHTML=''; return; }
+  emSearchTimer = setTimeout(async ()=>{
+    try{
+      const { contacts } = await api('/api/fm/email/contacts?q='+encodeURIComponent(q));
+      if(!contacts || !contacts.length){ dd.style.display='none'; dd.innerHTML=''; return; }
+      dd.innerHTML = contacts.map(c=>`<div class="em-opt" data-em="${esc(c.email)}" data-nm="${esc(c.name||'')}">${c.name?`<b>${esc(c.name)}</b> `:''}<span style="color:var(--ink-soft)">${esc(c.email)}</span></div>`).join('');
+      dd.style.display='block';
+      dd.querySelectorAll('[data-em]').forEach(o=> o.onclick=()=>{
+        emAddRecipient({ name:o.dataset.nm||null, email:o.dataset.em });
+        document.getElementById('em_input').value=''; dd.style.display='none'; dd.innerHTML='';
+      });
+    }catch{ dd.style.display='none'; }
+  }, 200);
+}
+function emOnKey(e){
+  if(e.key==='Enter' || e.key===','){
+    e.preventDefault();
+    const v = e.target.value.trim().replace(/,$/,'').trim();
+    if(v){ const m=v.match(/^(.*)<([^>]+)>$/); emAddRecipient(m?{name:m[1].trim(),email:m[2].trim()}:{email:v}); }
+    e.target.value='';
+    const dd=document.getElementById('em_dd'); if(dd){ dd.style.display='none'; dd.innerHTML=''; }
+  }
+}
+function emPickList(sel){
+  const id = sel.value; sel.value='';
+  const l = (state.emLists||[]).find(x=>x.id===id);
+  if(l && l.members) l.members.forEach(m=>emAddRecipient(m));
+}
+
+// ----- Email contacts manager -----
+async function openContactsModal(){
+  showModal(`<h3>Email contacts</h3><p class="msub">Saved recipients — new ones are added automatically when you send.</p>
+    <div class="row" style="gap:6px;margin-bottom:12px">
+      <input class="input" id="ct_name" placeholder="Name (optional)" style="flex:1"/>
+      <input class="input" id="ct_email" placeholder="email@company.com" style="flex:1.3"/>
+      <button class="btn sm" id="ct_add">Add</button>
+    </div>
+    <div id="ct_list" style="max-height:320px;overflow:auto"><div class="loading">Loading…</div></div>
+    <div class="modal-actions"><button class="btn ghost" id="mc">Close</button></div>`);
+  document.getElementById('mc').onclick = closeModal;
+  document.getElementById('ct_add').onclick = async ()=>{
+    const name = document.getElementById('ct_name').value.trim();
+    const email = document.getElementById('ct_email').value.trim();
+    if(!email.includes('@')){ toast('Enter a valid email','bad'); return; }
+    try { await api('/api/fm/email/contacts',{method:'POST',json:{name,email}}); document.getElementById('ct_name').value=''; document.getElementById('ct_email').value=''; loadContacts(); }
+    catch(e){ toast(e.message,'bad'); }
+  };
+  loadContacts();
+}
+async function loadContacts(){
+  const box = document.getElementById('ct_list'); if(!box) return;
+  try{
+    const { contacts } = await api('/api/fm/email/contacts?all=1');
+    box.innerHTML = contacts.length
+      ? contacts.map(c=>`<div class="row" style="justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f2ede8"><div style="min-width:0">${c.name?`<b>${esc(c.name)}</b> `:''}<span style="color:var(--ink-soft)">${esc(c.email)}</span></div><button class="btn sm ghost" data-ctdel="${c.id}">Delete</button></div>`).join('')
+      : `<div style="color:var(--ink-soft);padding:12px 0">No contacts yet — they'll appear here automatically as you send emails, or add one above.</div>`;
+    box.querySelectorAll('[data-ctdel]').forEach(b=> b.onclick=async ()=>{ try{ await api('/api/fm/email/contacts/'+b.dataset.ctdel,{method:'DELETE'}); loadContacts(); }catch(e){ toast(e.message,'bad'); } });
+  }catch(e){ box.innerHTML=`<div style="color:var(--stop)">${esc(e.message)}</div>`; }
 }
 
 function emailModeChange(){
@@ -1116,15 +1225,14 @@ function emailRepeatChange(){
 async function emailCreate(){
   const subject = document.getElementById('em_subj').value.trim();
   const body_html = document.getElementById('em_body').value.trim();
-  const rraw = document.getElementById('em_rcpts').value.trim();
   const errEl = document.getElementById('em_err');
+  // fold in anything still typed in the recipient box
+  const pending = document.getElementById('em_input').value.trim();
+  if(pending){ const m=pending.match(/^(.*)<([^>]+)>$/); emAddRecipient(m?{name:m[1].trim(),email:m[2].trim()}:{email:pending}); document.getElementById('em_input').value=''; }
+  const recipients = state.emRcpts || [];
   if(!subject){ errEl.textContent='Subject is required.'; return; }
   if(!body_html){ errEl.textContent='Message is required.'; return; }
-  const recipients = rraw.split(/\n+/).map(x=>x.trim()).filter(Boolean).map(line=>{
-    const m = line.match(/^(.*)<([^>]+)>$/);
-    return m ? { name:m[1].trim(), email:m[2].trim() } : { email:line };
-  }).filter(r=>r.email.includes('@'));
-  if(!recipients.length){ errEl.textContent='Add at least one valid recipient email.'; return; }
+  if(!recipients.length){ errEl.textContent='Add at least one recipient.'; return; }
   const mode = document.getElementById('em_mode').value;
   const payload = { subject, body_html, recipients, mode };
   if(mode==='once'){
@@ -1144,6 +1252,9 @@ async function emailCreate(){
   const btn = document.getElementById('mok'); btn.disabled=true; btn.textContent='Scheduling…';
   try {
     await api('/api/fm/email',{method:'POST',json:payload});
+    const slEl = document.getElementById('em_savelist');
+    const listName = slEl ? slEl.value.trim() : '';
+    if(listName){ try { await api('/api/fm/email/lists',{method:'POST',json:{name:listName, members:recipients}}); } catch {} }
     closeModal(); toast('Scheduled','good'); renderEmail();
   } catch(e){ btn.disabled=false; btn.textContent='Schedule'; errEl.textContent=e.message; }
 }
