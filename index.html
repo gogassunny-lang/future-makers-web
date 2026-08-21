@@ -6,6 +6,7 @@
 <title>Future Makers</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://apis.google.com/js/api.js"></script>
 <script src="config.js"></script>
 <style>
   :root {
@@ -369,6 +370,8 @@
 
 <script>
 const { API_BASE, SUPABASE_URL, SUPABASE_ANON_KEY } = window.FM_CONFIG;
+const DRIVE_API_KEY = 'AIzaSyBEfK6U4f9h7ygvF1N6VWyVc3dCESf_inw';
+const GOOGLE_PROJECT_NUMBER = '316135884993';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const root = document.getElementById('root');
 
@@ -460,6 +463,7 @@ function renderShell(inner){
   <div class="shell">
     <aside class="side">
       <div class="brand">${FM_MARK(30)}<div class="brand-name" style="color:#fff">Future Makers</div></div>
+      ${navItem('dashboard','Dashboard')}
       ${navItem('instruction','New Instruction')}
       ${navItem('campaigns','Campaigns')}
       ${navItem('lists','Broadcast Lists')}
@@ -1392,7 +1396,13 @@ function openWaModal(){
     <label class="field"><span>Campaign title (internal)</span><input class="input" id="wa_title" placeholder="Morning safety instruction"/></label>
     <label class="field"><span>Send to</span><select class="input" id="wa_ttype" onchange="waTargetChange()"><option value="group">A WhatsApp group</option><option value="person">A person</option></select></label>
     <div id="wa_target"></div>
-    <label class="field"><span>Video / file link (Google Drive or any URL) — optional, leave blank for a text-only message</span><input class="input" id="wa_media" placeholder="https://drive.google.com/…"/></label>
+    <label class="field"><span>Video / file — optional (leave blank for a text-only message)</span>
+      <div class="row" style="gap:8px;align-items:stretch">
+        <input class="input" id="wa_media" placeholder="Paste a link, or pick from Drive →" style="flex:1"/>
+        <button type="button" class="btn sm ghost" id="wa_drivebtn">📁 Drive</button>
+      </div>
+      <div id="wa_medianame" style="font-size:12px;color:var(--ink-soft);margin-top:4px"></div>
+    </label>
     <label class="field"><span>Caption / message</span><textarea class="input" id="wa_caption" rows="3" style="resize:vertical" placeholder="Good morning team! Today's targets attached."></textarea></label>
     <label class="field"><span>Assign to (who fires it) — optional</span><input class="input" id="wa_assign" placeholder="e.g. SG001 or 'Front desk tablet'"/></label>
     <label class="field"><span>When</span><select class="input" id="wa_mode"><option value="now">Now (put in the fire queue immediately)</option><option value="once">Once — pick date &amp; time</option><option value="recurring">Recurring</option></select></label>
@@ -1402,6 +1412,8 @@ function openWaModal(){
   document.getElementById('mc').onclick = closeModal;
   document.getElementById('wa_mode').onchange = waModeChange;
   document.getElementById('mok').onclick = waCreate;
+  const db = document.getElementById('wa_drivebtn');
+  if(db) db.onclick = () => openDrivePicker(d=>{ document.getElementById('wa_media').value = d.url; document.getElementById('wa_medianame').textContent = '📎 '+d.name; });
   waTargetChange();
   waModeChange();
 }
@@ -1472,9 +1484,81 @@ async function waCreate(){
   catch(e){ btn.disabled=false; btn.textContent='Schedule'; errEl.textContent=e.message; }
 }
 
+// ---------- DASHBOARD + GOOGLE DRIVE ----------
+async function renderDashboard(){
+  renderShell(`<div class="page-head"><div><div class="eyebrow">Overview</div><h2>Dashboard</h2><p>Everything at a glance. Connect Google Drive once to pick files anywhere.</p></div></div>
+    <div id="dashDrive"></div>
+    <div id="dashStats" class="rep-grid" style="margin-top:16px"><div class="loading">Loading…</div></div>`);
+  renderDriveCard();
+  try {
+    const [wa, waq, em, camps, lists] = await Promise.allSettled([
+      api('/api/fm/wa'), api('/api/fm/wa/queue'), api('/api/fm/email'), api('/api/campaigns'), api('/api/lists'),
+    ]);
+    const n = (r,k)=> r.status==='fulfilled' ? ((r.value[k])||[]).length : 0;
+    const card = (label,val,sub,page)=>`<div class="rep-card" style="cursor:pointer" data-goto="${page}"><h3 style="font-size:26px;margin:0">${val}</h3><div class="rl">${label}</div>${sub?`<div style="font-size:12px;color:#a0561e;font-weight:700;margin-top:4px">${sub}</div>`:''}</div>`;
+    const waDue = n(waq,'queue');
+    document.getElementById('dashStats').innerHTML =
+      card('WhatsApp campaigns', n(wa,'campaigns'), waDue?`🔥 ${waDue} due to fire`:'', 'wafire') +
+      card('Email automations', n(em,'campaigns'), '', 'email') +
+      card('Broadcast campaigns', n(camps,'campaigns'), '', 'campaigns') +
+      card('Broadcast lists', n(lists,'lists'), '', 'lists');
+    document.querySelectorAll('[data-goto]').forEach(c=> c.onclick=()=>{ state.page=c.dataset.goto; state.activeList=null; state.activeReport=null; route(); });
+  } catch(e){ document.getElementById('dashStats').innerHTML=`<div class="empty"><p>${esc(e.message)}</p></div>`; }
+}
+
+function renderDriveCard(){
+  const box = document.getElementById('dashDrive'); if(!box) return;
+  box.innerHTML = `<div class="panel" style="padding:16px"><div class="loading">Checking Drive…</div></div>`;
+  api('/api/fm/drive/status').then(st=>{
+    box.innerHTML = st.connected
+      ? `<div class="panel" style="padding:16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+           <div style="min-width:0"><div style="font-size:12px;color:var(--ink-soft)">Google Drive connected</div><div style="font-weight:700">📁 ${esc(st.email)}</div></div>
+           <div style="display:flex;gap:8px"><button class="btn sm ghost" id="drvChange">Change</button><button class="btn sm ghost" id="drvOff">Disconnect</button></div>
+         </div>`
+      : `<div class="panel" style="padding:16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border:1.5px solid #d97b3a">
+           <div style="min-width:0"><div style="font-weight:800">Connect Google Drive</div><div style="font-size:12px;color:var(--ink-soft)">Connect once — remembered permanently. Then pick videos & files from Drive anywhere in the app.</div></div>
+           <button class="btn" id="drvOn">📁 Connect Drive</button>
+         </div>`;
+    const on=document.getElementById('drvOn'); if(on) on.onclick=driveConnect;
+    const ch=document.getElementById('drvChange'); if(ch) ch.onclick=driveConnect;
+    const off=document.getElementById('drvOff'); if(off) off.onclick=driveDisconnect;
+  }).catch(e=>{ box.innerHTML=`<div class="panel" style="padding:16px;color:var(--stop)">Drive: ${esc(e.message)}</div>`; });
+}
+async function driveConnect(){ try{ const j=await api('/api/fm/drive/connect',{method:'POST',json:{}}); window.location.href=j.url; }catch(e){ toast(e.message,'bad'); } }
+async function driveDisconnect(){ if(!confirm('Disconnect Google Drive? Pick-from-Drive will stop working until you reconnect.')) return; try{ await api('/api/fm/drive/disconnect',{method:'POST',json:{}}); toast('Drive disconnected','good'); renderDriveCard(); }catch(e){ toast(e.message,'bad'); } }
+
+// ----- Google Drive Picker (used by any "Choose from Drive" button) -----
+let _pickerReady = false;
+function loadPicker(cb){ if(_pickerReady) return cb(); if(!window.gapi){ toast('Google API still loading — retry in a moment','bad'); return; } gapi.load('picker', ()=>{ _pickerReady=true; cb(); }); }
+async function openDrivePicker(onPick){
+  let token;
+  try {
+    const st = await api('/api/fm/drive/status');
+    if(!st.connected){ toast('Connect Google Drive first — on the Dashboard','bad'); state.page='dashboard'; route(); return; }
+    token = (await api('/api/fm/drive/token')).access_token;
+  } catch(e){ toast('Drive: '+e.message,'bad'); return; }
+  loadPicker(()=>{
+    const view = new google.picker.DocsView(google.picker.ViewId.DOCS).setIncludeFolders(true).setSelectFolderEnabled(false);
+    const picker = new google.picker.PickerBuilder()
+      .setAppId(GOOGLE_PROJECT_NUMBER)
+      .setOAuthToken(token)
+      .setDeveloperKey(DRIVE_API_KEY)
+      .addView(view)
+      .setCallback(data=>{
+        if(data.action===google.picker.Action.PICKED && data.docs && data.docs[0]){
+          const d = data.docs[0];
+          onPick({ id:d.id, name:d.name, url:d.url || ('https://drive.google.com/file/d/'+d.id+'/view') });
+        }
+      })
+      .build();
+    picker.setVisible(true);
+  });
+}
+
 // ---------- ROUTER ----------
 function route(){
   switch(state.page){
+    case 'dashboard': renderDashboard(); break;
     case 'lists': state.activeList?renderListDetail():renderLists(); break;
     case 'instruction': renderInstruction(); break;
     case 'campaigns': renderCampaigns(); break;
@@ -1502,20 +1586,24 @@ async function boot(){
     const { data: prof } = await sb.from('users').select('*').eq('id', state.user.id).single();
     state.profile = prof || { email: state.user.email, role: 'user', name: '' };
   } catch { state.profile = { email: state.user.email, role: 'user', name: '' }; }
-  // Returning from the Google email OAuth flow?
+  // Returning from a Google OAuth flow (email or drive)?
   const h = location.hash || '';
+  const addr = () => { const m = h.match(/addr=([^&]+)/); return m ? ': ' + decodeURIComponent(m[1]) : ''; };
   if (h.includes('email=connected')){
-    const m = h.match(/addr=([^&]+)/);
-    toast('Email connected' + (m ? ': ' + decodeURIComponent(m[1]) : ''), 'good');
+    toast('Email connected' + addr(), 'good');
     history.replaceState(null,'',location.pathname+location.search);
     state.page='email'; route(); return;
   }
-  if (h.includes('email=error')){
-    toast('Email connection failed — please try again', 'bad');
+  if (h.includes('drive=connected')){
+    toast('Google Drive connected' + addr(), 'good');
     history.replaceState(null,'',location.pathname+location.search);
-    state.page='email'; route(); return;
+    state.page='dashboard'; route(); return;
   }
-  state.page='lists'; route();
+  if (h.includes('connect=error') || h.includes('email=error')){
+    toast('Connection failed — please try again', 'bad');
+    history.replaceState(null,'',location.pathname+location.search);
+  }
+  state.page='dashboard'; route();
 }
 boot();
 </script>
