@@ -1354,7 +1354,10 @@ async function renderWaFire(){
           <td>${q.target_type==='person'?'👤':'👥'} ${esc(q.target_name)}${q.target_number?` <span style="color:var(--ink-soft)">(${esc(q.target_number)})</span>`:''}</td>
           <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(q.caption||'—')}</td>
           <td>${q.media_url?`<a href="${esc(q.media_url)}" target="_blank" rel="noopener">open</a>`:'—'}</td>
-          <td><button class="btn sm" data-wafired="${q.id}">Mark sent</button></td>
+          <td><div class="row-actions">
+            <button class="btn sm" data-waopen="${q.id}">📲 WhatsApp</button>
+            <button class="btn sm ghost" data-wafired="${q.id}">Mark sent</button>
+          </div></td>
         </tr>`).join('')}
         </tbody></table></div>`;
     }
@@ -1373,6 +1376,7 @@ async function renderWaFire(){
       </tr>`).join('')}
       </tbody></table></div>` : `<div class="empty"><h3>No campaigns yet</h3><p>Create your first WhatsApp campaign — schedule it now, once, or recurring.</p></div>`;
     area.innerHTML = html;
+    area.querySelectorAll('[data-waopen]').forEach(b=> b.onclick=()=>waOpenWhatsapp((queue||[]).find(x=>x.id===b.dataset.waopen)));
     area.querySelectorAll('[data-wafired]').forEach(b=> b.onclick=()=>waFired(b.dataset.wafired));
     area.querySelectorAll('[data-wastop]').forEach(b=> b.onclick=()=>waAction(b.dataset.wastop,'stop'));
     area.querySelectorAll('[data-waresume]').forEach(b=> b.onclick=()=>waAction(b.dataset.waresume,'resume'));
@@ -1381,6 +1385,20 @@ async function renderWaFire(){
   }
 }
 
+function waOpenWhatsapp(q){
+  if(!q) return;
+  const text = q.caption ? encodeURIComponent(q.caption) : '';
+  if(q.target_type==='person' && q.target_number){
+    const digits = q.target_number.replace(/\D/g,'');
+    window.open('https://wa.me/'+digits+(text?('?text='+text):''), '_blank');
+    if(q.media_url) toast('WhatsApp opened. Attach the media (Open link), then Send — then Mark sent.','good');
+  } else {
+    // group: WhatsApp has no by-name deep link — copy caption + open WhatsApp Web
+    if(navigator.clipboard && q.caption) navigator.clipboard.writeText(q.caption).catch(()=>{});
+    toast('Caption copied. Open WhatsApp, search the group "'+(q.target_name||'')+'", paste & send.','good');
+    window.open('https://web.whatsapp.com/', '_blank');
+  }
+}
 async function waFired(id){
   if(!confirm('Mark this campaign as sent? Do this after you have tapped send in WhatsApp.')) return;
   try { await api('/api/fm/wa/'+id+'/fired',{method:'POST',json:{}}); toast('Marked sent','good'); renderWaFire(); }
