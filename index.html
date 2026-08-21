@@ -465,6 +465,7 @@ function renderShell(inner){
       ${navItem('lists','Broadcast Lists')}
       ${navItem('reports','Campaign Reports')}
       ${navItem('email','Email Automation')}
+      ${navItem('wafire','WhatsApp Fire')}
       <div class="side-foot">
         <div class="who-row">
           <div class="who"><b>${esc(p.name||p.email||'User')}</b>${esc(p.email||'')}<br/><span class="role-tag">${esc((p.role||'user').replace('_',' '))}</span></div>
@@ -1322,6 +1323,149 @@ async function emailCreate(){
   } catch(e){ btn.disabled=false; btn.textContent='Schedule'; errEl.textContent=e.message; }
 }
 
+// ---------- WHATSAPP FIRE (Stage B1) ----------
+function waDate(iso){ return iso ? new Date(iso).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '—'; }
+function waRepeatLabel(c){ return c.repeat_type==='none' ? (c.mode==='now'?'One-time · now':'One-time') : ({daily:'Daily',weekdays:'Weekdays',weekly:'Weekly',monthly:'Monthly'}[c.repeat_type]||c.repeat_type); }
+function waPill(s){ const m={scheduled:['opt-no','Scheduled'],due:['opt-yes','Due to fire'],sent:['opt-no','Sent'],done:['opt-no','Done'],stopped:['opt-no','Stopped']}; const [cls,txt]=m[s]||['opt-no',s]; return `<span class="opt-pill ${cls}"><span class="opt-dot"></span>${txt}</span>`; }
+
+async function renderWaFire(){
+  renderShell(`<div class="page-head">
+    <div><div class="eyebrow">Broadcast</div><h2>WhatsApp Fire</h2><p>Schedule WhatsApp campaigns. When one comes due you get it in the Fire queue and tap send on your phone — no API, no ban risk.</p></div>
+    <button class="btn" id="waNew">+ New campaign</button>
+  </div><div id="waArea"><div class="loading">Loading…</div></div>`);
+  document.getElementById('waNew').onclick = openWaModal;
+  const area = document.getElementById('waArea');
+  try {
+    const [{ queue }, { campaigns }] = await Promise.all([
+      api('/api/fm/wa/queue'),
+      api('/api/fm/wa'),
+    ]);
+    let html = '';
+    if(queue.length){
+      html += `<div class="panel" style="margin-bottom:18px;border:1.5px solid #d97b3a">
+        <div style="padding:12px 16px;font-weight:800;color:#a0561e">🔥 Due to fire now (${queue.length})</div>
+        <table><thead><tr><th>Campaign</th><th>Send to</th><th>Caption</th><th>Media</th><th></th></tr></thead><tbody>
+        ${queue.map(q=>`<tr>
+          <td><b>${esc(q.title)}</b></td>
+          <td>${q.target_type==='person'?'👤':'👥'} ${esc(q.target_name)}${q.target_number?` <span style="color:var(--ink-soft)">(${esc(q.target_number)})</span>`:''}</td>
+          <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(q.caption||'—')}</td>
+          <td>${q.media_url?`<a href="${esc(q.media_url)}" target="_blank" rel="noopener">open</a>`:'—'}</td>
+          <td><button class="btn sm" data-wafired="${q.id}">Mark sent</button></td>
+        </tr>`).join('')}
+        </tbody></table></div>`;
+    }
+    html += `<div class="h2" style="margin:0 0 8px 4px;font-size:15px">All campaigns (${campaigns.length})</div>`;
+    html += campaigns.length ? `<div class="panel"><table><thead><tr><th>Campaign</th><th>Target</th><th>Schedule</th><th>Status</th><th>Next / last</th><th></th></tr></thead><tbody>
+      ${campaigns.map(c=>`<tr>
+        <td><b>${esc(c.title)}</b>${c.caption?`<div style="font-size:12px;color:var(--ink-soft);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.caption)}</div>`:''}</td>
+        <td>${c.target_type==='person'?'👤':'👥'} ${esc(c.target_name)}</td>
+        <td class="phone-cell">${waRepeatLabel(c)}</td>
+        <td>${waPill(c.status)}</td>
+        <td class="phone-cell">${c.next_run_at?'Next '+waDate(c.next_run_at):(c.last_fired_at?'Last '+waDate(c.last_fired_at):'—')}</td>
+        <td><div class="row-actions">
+          ${['scheduled','due'].includes(c.status)?`<button class="btn sm danger" data-wastop="${c.id}">Stop</button>`:''}
+          ${c.status==='stopped'||c.status==='done'?`<button class="btn sm ghost" data-waresume="${c.id}">Restart</button>`:''}
+        </div></td>
+      </tr>`).join('')}
+      </tbody></table></div>` : `<div class="empty"><h3>No campaigns yet</h3><p>Create your first WhatsApp campaign — schedule it now, once, or recurring.</p></div>`;
+    area.innerHTML = html;
+    area.querySelectorAll('[data-wafired]').forEach(b=> b.onclick=()=>waFired(b.dataset.wafired));
+    area.querySelectorAll('[data-wastop]').forEach(b=> b.onclick=()=>waAction(b.dataset.wastop,'stop'));
+    area.querySelectorAll('[data-waresume]').forEach(b=> b.onclick=()=>waAction(b.dataset.waresume,'resume'));
+  } catch(e){
+    area.innerHTML = `<div class="empty"><h3>Couldn't load</h3><p>${esc(e.message)}</p></div>`;
+  }
+}
+
+async function waFired(id){
+  if(!confirm('Mark this campaign as sent? Do this after you have tapped send in WhatsApp.')) return;
+  try { await api('/api/fm/wa/'+id+'/fired',{method:'POST',json:{}}); toast('Marked sent','good'); renderWaFire(); }
+  catch(e){ toast(e.message,'bad'); }
+}
+async function waAction(id, act){
+  try { await api('/api/fm/wa/'+id+'/'+act,{method:'POST',json:{}}); toast('Done','good'); renderWaFire(); }
+  catch(e){ toast(e.message,'bad'); }
+}
+
+function openWaModal(){
+  showModal(`<h3>New WhatsApp campaign</h3><p class="msub">Schedules a campaign. When it's due you tap send on your phone.</p>
+    <label class="field"><span>Campaign title (internal)</span><input class="input" id="wa_title" placeholder="Morning safety instruction"/></label>
+    <label class="field"><span>Send to</span><select class="input" id="wa_ttype" onchange="waTargetChange()"><option value="group">A WhatsApp group</option><option value="person">A person</option></select></label>
+    <div id="wa_target"></div>
+    <label class="field"><span>Video / file link (Google Drive or any URL) — optional</span><input class="input" id="wa_media" placeholder="https://drive.google.com/…"/></label>
+    <label class="field"><span>Caption / message</span><textarea class="input" id="wa_caption" rows="3" style="resize:vertical" placeholder="Good morning team! Today's targets attached."></textarea></label>
+    <label class="field"><span>Assign to (who fires it) — optional</span><input class="input" id="wa_assign" placeholder="e.g. SG001 or 'Front desk tablet'"/></label>
+    <label class="field"><span>When</span><select class="input" id="wa_mode"><option value="now">Now (put in the fire queue immediately)</option><option value="once">Once — pick date &amp; time</option><option value="recurring">Recurring</option></select></label>
+    <div id="wa_sched"></div>
+    <div class="err" id="wa_err"></div>
+    <div class="modal-actions"><button class="btn ghost" id="mc">Cancel</button><button class="btn" id="mok">Schedule</button></div>`);
+  document.getElementById('mc').onclick = closeModal;
+  document.getElementById('wa_mode').onchange = waModeChange;
+  document.getElementById('mok').onclick = waCreate;
+  waTargetChange();
+  waModeChange();
+}
+function waTargetChange(){
+  const t = document.getElementById('wa_ttype').value;
+  const box = document.getElementById('wa_target'); if(!box) return;
+  box.innerHTML = t==='person'
+    ? `<label class="field"><span>Person's name</span><input class="input" id="wa_tname" placeholder="Rakesh Sharma"/></label><label class="field"><span>Phone (with country code)</span><input class="input" id="wa_tnum" placeholder="+9198…"/></label>`
+    : `<label class="field"><span>Exact WhatsApp group name</span><input class="input" id="wa_tname" placeholder="GOGAS Field Team"/></label>`;
+}
+function waModeChange(){
+  const mode = document.getElementById('wa_mode').value;
+  const s = document.getElementById('wa_sched'); if(!s) return;
+  if(mode==='now'){ s.innerHTML=''; return; }
+  if(mode==='once'){ s.innerHTML = `<label class="field"><span>Date &amp; time (IST)</span><input class="input" id="wa_when" type="datetime-local"/></label>`; return; }
+  s.innerHTML = `
+    <label class="field"><span>Repeat</span><select class="input" id="wa_rt" onchange="waRepeatChange()">
+      <option value="daily">Every day</option><option value="weekdays">Weekdays (Mon–Fri)</option>
+      <option value="weekly">Weekly — pick days</option><option value="monthly">Monthly — pick date</option>
+    </select></label>
+    <div id="wa_rt_extra"></div>
+    <label class="field"><span>Time (IST)</span><input class="input" id="wa_time" type="time" value="09:00"/></label>
+    <label class="field"><span>End date — optional</span><input class="input" id="wa_end" type="date"/></label>`;
+  waRepeatChange();
+}
+function waRepeatChange(){
+  const rt = document.getElementById('wa_rt').value, e = document.getElementById('wa_rt_extra'); if(!e) return;
+  if(rt==='weekly'){ const d=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    e.innerHTML = `<label class="field"><span>Days</span><div style="display:flex;flex-wrap:wrap;gap:12px">`+d.map((x,i)=>`<label style="display:flex;align-items:center;gap:5px;font-size:13px"><input type="checkbox" class="wa_day" value="${i}"/> ${x}</label>`).join('')+`</div></label>`;
+  } else if(rt==='monthly'){ e.innerHTML = `<label class="field"><span>Day of month (1–28)</span><input class="input" id="wa_dom" type="number" min="1" max="28" value="1"/></label>`; }
+  else e.innerHTML='';
+}
+async function waCreate(){
+  const errEl = document.getElementById('wa_err');
+  const title = document.getElementById('wa_title').value.trim();
+  const target_type = document.getElementById('wa_ttype').value;
+  const target_name = document.getElementById('wa_tname') ? document.getElementById('wa_tname').value.trim() : '';
+  if(!title){ errEl.textContent='Campaign title is required.'; return; }
+  if(!target_name){ errEl.textContent='Enter the target group or person.'; return; }
+  const payload = {
+    title, target_type, target_name,
+    media_url: document.getElementById('wa_media').value.trim(),
+    caption: document.getElementById('wa_caption').value.trim(),
+    assigned_to: document.getElementById('wa_assign').value.trim(),
+    mode: document.getElementById('wa_mode').value,
+  };
+  if(target_type==='person'){
+    const num = document.getElementById('wa_tnum') ? document.getElementById('wa_tnum').value.trim() : '';
+    if(!num){ errEl.textContent='Enter the phone number for a person.'; return; }
+    payload.target_number = num;
+  }
+  if(payload.mode==='once'){ const w=document.getElementById('wa_when').value; if(!w){ errEl.textContent='Pick a date & time.'; return; } payload.run_at=new Date(w).toISOString(); }
+  else if(payload.mode==='recurring'){
+    payload.repeat_type=document.getElementById('wa_rt').value;
+    payload.send_time=document.getElementById('wa_time').value||'09:00';
+    const end=document.getElementById('wa_end').value; if(end) payload.ends_on=end;
+    if(payload.repeat_type==='weekly'){ payload.repeat_days=[...document.querySelectorAll('.wa_day:checked')].map(x=>+x.value); if(!payload.repeat_days.length){ errEl.textContent='Pick at least one day.'; return; } }
+    if(payload.repeat_type==='monthly'){ payload.repeat_dom=+document.getElementById('wa_dom').value||1; }
+  }
+  const btn=document.getElementById('mok'); btn.disabled=true; btn.textContent='Scheduling…';
+  try { await api('/api/fm/wa',{method:'POST',json:payload}); closeModal(); toast('Campaign scheduled','good'); renderWaFire(); }
+  catch(e){ btn.disabled=false; btn.textContent='Schedule'; errEl.textContent=e.message; }
+}
+
 // ---------- ROUTER ----------
 function route(){
   switch(state.page){
@@ -1330,6 +1474,7 @@ function route(){
     case 'campaigns': renderCampaigns(); break;
     case 'reports': renderReports(); break;
     case 'email': renderEmail(); break;
+    case 'wafire': renderWaFire(); break;
     default: renderLists();
   }
 }
