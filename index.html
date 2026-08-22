@@ -1355,7 +1355,7 @@ async function renderWaFire(){
           <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(q.caption||'—')}</td>
           <td>${q.media_url?`<a href="${esc(q.media_url)}" target="_blank" rel="noopener">open</a>`:'—'}</td>
           <td><div class="row-actions">
-            <button class="btn sm" data-waopen="${q.id}">📲 WhatsApp</button>
+            ${canFire() ? `<button class="btn sm" data-wafire="${q.id}">🔥 Fire</button>` : `<button class="btn sm" data-waopen="${q.id}">📲 WhatsApp</button>`}
             <button class="btn sm ghost" data-wafired="${q.id}">Mark sent</button>
           </div></td>
         </tr>`).join('')}
@@ -1377,11 +1377,56 @@ async function renderWaFire(){
       </tbody></table></div>` : `<div class="empty"><h3>No campaigns yet</h3><p>Create your first WhatsApp campaign — schedule it now, once, or recurring.</p></div>`;
     area.innerHTML = html;
     area.querySelectorAll('[data-waopen]').forEach(b=> b.onclick=()=>waOpenWhatsapp((queue||[]).find(x=>x.id===b.dataset.waopen)));
+    area.querySelectorAll('[data-wafire]').forEach(b=> b.onclick=()=>waFireInApp((queue||[]).find(x=>x.id===b.dataset.wafire)));
     area.querySelectorAll('[data-wafired]').forEach(b=> b.onclick=()=>waFired(b.dataset.wafired));
     area.querySelectorAll('[data-wastop]').forEach(b=> b.onclick=()=>waAction(b.dataset.wastop,'stop'));
     area.querySelectorAll('[data-waresume]').forEach(b=> b.onclick=()=>waAction(b.dataset.waresume,'resume'));
   } catch(e){
     area.innerHTML = `<div class="empty"><h3>Couldn't load</h3><p>${esc(e.message)}</p></div>`;
+  }
+}
+
+// running inside our custom native FM Fire app? (bridge injected)
+function inFireApp(){ try { return !!(window.AndroidFire && window.AndroidFire.isFireApp && window.AndroidFire.isFireApp()); } catch(e){ return false; } }
+// can this device attach-and-share? (Median app / mobile Chrome via Web Share, or our custom app)
+function canFire(){ return inFireApp() || !!navigator.share; }
+
+// Fire: download the Drive file and share it into WhatsApp with the media + caption attached.
+//  - Custom app  -> native AndroidFire bridge
+//  - Median app / mobile Chrome -> Web Share API (navigator.share with the file)
+async function waFireInApp(q){
+  if(!q) return;
+  // Path A: our custom native app
+  if(inFireApp()){
+    try {
+      if(q.media_drive_id){
+        toast('Preparing file…','good');
+        const tok = (await api('/api/fm/drive/token')).access_token;
+        window.AndroidFire.shareDriveFile(tok, q.media_drive_id, q.media_mime||'application/octet-stream', q.media_name||'media', q.caption||'');
+      } else {
+        window.AndroidFire.shareText(q.caption||'');
+      }
+    } catch(e){ toast('Fire failed: '+e.message,'bad'); }
+    return;
+  }
+  // Path B: Web Share (Median app / mobile Chrome)
+  try {
+    let file = null;
+    if(q.media_drive_id){
+      toast('Preparing file…','good');
+      const tok = (await api('/api/fm/drive/token')).access_token;
+      const r = await fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(q.media_drive_id)+'?alt=media', { headers:{ Authorization:'Bearer '+tok } });
+      if(!r.ok) throw new Error('Drive download failed ('+r.status+')');
+      const blob = await r.blob();
+      file = new File([blob], q.media_name||'media', { type: q.media_mime || blob.type || 'application/octet-stream' });
+    }
+    const data = { text: q.caption || '' };
+    if(file && navigator.canShare && navigator.canShare({ files:[file] })) data.files = [file];
+    if(navigator.share){ await navigator.share(data); }
+    else { waOpenWhatsapp(q); }   // desktop fallback
+  } catch(e){
+    if(e && e.name === 'AbortError') return;  // user closed the share sheet
+    toast('Share failed: '+e.message,'bad');
   }
 }
 
@@ -1430,8 +1475,9 @@ function openWaModal(){
   document.getElementById('mc').onclick = closeModal;
   document.getElementById('wa_mode').onchange = waModeChange;
   document.getElementById('mok').onclick = waCreate;
+  state.waPicked = null;
   const db = document.getElementById('wa_drivebtn');
-  if(db) db.onclick = () => openDrivePicker(d=>{ document.getElementById('wa_media').value = d.url; document.getElementById('wa_medianame').textContent = '📎 '+d.name; });
+  if(db) db.onclick = () => openDrivePicker(d=>{ state.waPicked = { id:d.id, name:d.name, mime:d.mime }; document.getElementById('wa_media').value = d.url; document.getElementById('wa_medianame').textContent = '📎 '+d.name; });
   waTargetChange();
   waModeChange();
 }
@@ -1474,6 +1520,9 @@ async function waCreate(){
   const payload = {
     title, target_type, target_name,
     media_url: document.getElementById('wa_media').value.trim(),
+    media_drive_id: state.waPicked ? state.waPicked.id : null,
+    media_name: state.waPicked ? state.waPicked.name : null,
+    media_mime: state.waPicked ? state.waPicked.mime : null,
     caption: document.getElementById('wa_caption').value.trim(),
     assigned_to: document.getElementById('wa_assign').value.trim(),
     mode: document.getElementById('wa_mode').value,
@@ -1565,7 +1614,7 @@ async function openDrivePicker(onPick){
       .setCallback(data=>{
         if(data.action===google.picker.Action.PICKED && data.docs && data.docs[0]){
           const d = data.docs[0];
-          onPick({ id:d.id, name:d.name, url:d.url || ('https://drive.google.com/file/d/'+d.id+'/view') });
+          onPick({ id:d.id, name:d.name, mime:d.mimeType||'', url:d.url || ('https://drive.google.com/file/d/'+d.id+'/view') });
         }
       })
       .build();
