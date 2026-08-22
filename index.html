@@ -347,14 +347,36 @@
   .sim-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; padding: 14px 16px; background: #fdf6ec; border: 1px solid #f0dcc0; border-radius: 11px; align-items: center; }
   .sim-bar .sl { font-size: 12px; font-weight: 600; color: #8a6d3b; margin-right: auto; }
 
-  @media (max-width: 760px) {
-    .shell { grid-template-columns: 1fr; }
-    .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; }
-    .side .brand { margin-bottom: 0; margin-right: auto; }
-    .side-foot { margin-top: 0; border: none; padding-top: 0; width: 100%; display: flex; justify-content: space-between; align-items: center; }
-    .nav-item { width: auto; }
-    .main { padding: 22px 18px; }
+  /* mobile app bar + drawer (hidden on desktop) */
+  .mtopbar { display: none; }
+  .scrim { display: none; }
+  @media (max-width: 860px) {
+    .shell { display: block; }
+    .mtopbar {
+      display: flex; align-items: center; gap: 12px;
+      position: sticky; top: 0; z-index: 40;
+      background: var(--ink); color: #fff; padding: 11px 14px;
+    }
+    .mtopbar .brand-name { color: #fff; font-size: 16px; }
+    .mmenu { font-size: 22px; line-height: 1; color: #fff; width: 42px; height: 42px; display: grid; place-items: center; border-radius: 9px; }
+    .mmenu:active { background: rgba(255,255,255,.12); }
+    .side {
+      position: fixed; top: 0; left: 0; height: 100vh; width: 268px; max-width: 82vw;
+      z-index: 60; transform: translateX(-100%); transition: transform .22s ease;
+      box-shadow: 0 0 44px rgba(0,0,0,.45); overflow-y: auto;
+    }
+    .side.open { transform: translateX(0); }
+    .scrim { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 50; }
+    .scrim.show { display: block; }
+    .nav-item { padding: 13px 12px; font-size: 15px; }   /* bigger touch targets */
+    .main { padding: 16px 14px; max-width: none; }
     .page-head { flex-direction: column; }
+    .page-head .btn { width: 100%; justify-content: center; }
+    .panel { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .panel table { min-width: 560px; }
+    .grid, .rep-grid { grid-template-columns: 1fr !important; }
+    .modal { width: 94vw; max-height: 88vh; overflow-y: auto; }
+    .btn, .input { font-size: 15px; }
   }
   .em-tobox{position:relative}
   .em-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
@@ -461,7 +483,12 @@ function renderShell(inner){
   const p = state.profile || {};
   root.innerHTML = `
   <div class="shell">
-    <aside class="side">
+    <div class="mtopbar">
+      <button class="mmenu" id="mMenu" aria-label="Menu">☰</button>
+      <div class="brand">${FM_MARK(24)}<div class="brand-name">Future Makers</div></div>
+    </div>
+    <div class="scrim" id="mScrim"></div>
+    <aside class="side" id="mSide">
       <div class="brand">${FM_MARK(30)}<div class="brand-name" style="color:#fff">Future Makers</div></div>
       ${navItem('dashboard','Dashboard')}
       ${navItem('instruction','New Instruction')}
@@ -483,6 +510,11 @@ function renderShell(inner){
   document.querySelectorAll('[data-nav]').forEach(b=> b.onclick=()=>{ state.page=b.dataset.nav; state.activeList=null; state.activeReport=null; route(); });
   document.getElementById('signout').onclick = async ()=>{ await sb.auth.signOut(); state.user=null; renderLogin(); };
   document.getElementById('editProfile').onclick = openProfileModal;
+  // mobile drawer
+  const side = document.getElementById('mSide'), scrim = document.getElementById('mScrim'), menu = document.getElementById('mMenu');
+  const closeDrawer = ()=>{ if(side) side.classList.remove('open'); if(scrim) scrim.classList.remove('show'); };
+  if(menu) menu.onclick = ()=>{ side.classList.add('open'); scrim.classList.add('show'); };
+  if(scrim) scrim.onclick = closeDrawer;
 }
 
 function placeholderPage(title, desc){
@@ -1388,6 +1420,8 @@ async function renderWaFire(){
 
 // running inside our custom native FM Fire app? (bridge injected)
 function inFireApp(){ try { return !!(window.AndroidFire && window.AndroidFire.isFireApp && window.AndroidFire.isFireApp()); } catch(e){ return false; } }
+// running inside an app wrapper (Median/GoNative) where the Google Drive PICKER can't log in?
+function inWrapper(){ try { return !!(window.median || window.gonative || /median|gonative|webview/i.test(navigator.userAgent||'')); } catch(e){ return false; } }
 // can this device attach-and-share? (Median app / mobile Chrome via Web Share, or our custom app)
 function canFire(){ return inFireApp() || !!navigator.share; }
 
@@ -1462,9 +1496,9 @@ function openWaModal(){
     <label class="field"><span>Video / file — optional (leave blank for a text-only message)</span>
       <div class="row" style="gap:8px;align-items:stretch">
         <input class="input" id="wa_media" placeholder="Paste a link, or pick from Drive →" style="flex:1"/>
-        <button type="button" class="btn sm ghost" id="wa_drivebtn">📁 Drive</button>
+        ${inWrapper() ? '' : '<button type="button" class="btn sm ghost" id="wa_drivebtn">📁 Drive</button>'}
       </div>
-      <div id="wa_medianame" style="font-size:12px;color:var(--ink-soft);margin-top:4px"></div>
+      <div id="wa_medianame" style="font-size:12px;color:var(--ink-soft);margin-top:4px">${inWrapper() ? '📁 To attach a Drive video, create this campaign on a computer (the Drive picker needs a browser). Here you can still send text-only or fire campaigns already scheduled.' : ''}</div>
     </label>
     <label class="field"><span>Caption / message</span><textarea class="input" id="wa_caption" rows="3" style="resize:vertical" placeholder="Good morning team! Today's targets attached."></textarea></label>
     <label class="field"><span>Assign to (who fires it) — optional</span><input class="input" id="wa_assign" placeholder="e.g. SG001 or 'Front desk tablet'"/></label>
