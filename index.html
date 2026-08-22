@@ -668,7 +668,7 @@ function val(id){ return document.getElementById(id).value.trim(); }
 
 // ---------- MODAL primitives ----------
 function showModal(html){ const bg=document.createElement('div'); bg.className='modal-bg'; bg.id='modalBg'; bg.innerHTML=`<div class="modal">${html}</div>`; bg.onclick=(e)=>{ if(e.target===bg) closeModal(); }; document.body.appendChild(bg); }
-function closeModal(){ const m=document.getElementById('modalBg'); if(m) m.remove(); }
+function closeModal(){ const m=document.getElementById('modalBg'); if(m) m.remove(); if(typeof waClearDraft==='function') waClearDraft(); }
 
 // ---------- NEW INSTRUCTION (campaign builder) ----------
 let builder = null;
@@ -1367,9 +1367,10 @@ function waPill(s){ const m={scheduled:['opt-no','Scheduled'],due:['opt-yes','Du
 async function renderWaFire(){
   renderShell(`<div class="page-head">
     <div><div class="eyebrow">Broadcast</div><h2>WhatsApp Fire</h2><p>Schedule WhatsApp campaigns. When one comes due you get it in the Fire queue and tap send on your phone — no API, no ban risk.</p></div>
-    <button class="btn" id="waNew">+ New campaign</button>
+    <div class="row" style="gap:8px"><button class="btn ghost" id="waRefresh">↻ Refresh</button><button class="btn" id="waNew">+ New campaign</button></div>
   </div><div id="waArea"><div class="loading">Loading…</div></div>`);
   document.getElementById('waNew').onclick = openWaModal;
+  document.getElementById('waRefresh').onclick = ()=>renderWaFire();
   const area = document.getElementById('waArea');
   try {
     const [{ queue }, { campaigns }] = await Promise.all([
@@ -1404,6 +1405,7 @@ async function renderWaFire(){
         <td><div class="row-actions">
           ${['scheduled','due'].includes(c.status)?`<button class="btn sm danger" data-wastop="${c.id}">Stop</button>`:''}
           ${c.status==='stopped'||c.status==='done'?`<button class="btn sm ghost" data-waresume="${c.id}">Restart</button>`:''}
+          <button class="btn sm ghost" data-wadel="${c.id}" title="Delete campaign">🗑</button>
         </div></td>
       </tr>`).join('')}
       </tbody></table></div>` : `<div class="empty"><h3>No campaigns yet</h3><p>Create your first WhatsApp campaign — schedule it now, once, or recurring.</p></div>`;
@@ -1413,9 +1415,12 @@ async function renderWaFire(){
     area.querySelectorAll('[data-wafired]').forEach(b=> b.onclick=()=>waFired(b.dataset.wafired));
     area.querySelectorAll('[data-wastop]').forEach(b=> b.onclick=()=>waAction(b.dataset.wastop,'stop'));
     area.querySelectorAll('[data-waresume]').forEach(b=> b.onclick=()=>waAction(b.dataset.waresume,'resume'));
+    area.querySelectorAll('[data-wadel]').forEach(b=> b.onclick=()=>waDelete(b.dataset.wadel, (campaigns||[]).find(x=>x.id===b.dataset.wadel)));
   } catch(e){
     area.innerHTML = `<div class="empty"><h3>Couldn't load</h3><p>${esc(e.message)}</p></div>`;
   }
+  // #1 — if a New-campaign draft was open before an app reload, reopen it with the saved values
+  try { if(localStorage.getItem('fm_wa_open')==='1' && !document.getElementById('modalBg')) openWaModal(); } catch(e){}
 }
 
 // running inside our custom native FM Fire app? (bridge injected)
@@ -1457,11 +1462,12 @@ async function waFireInApp(q){
       const blob = await r.blob();
       file = new File([blob], q.media_name||'media', { type: q.media_mime || blob.type || 'application/octet-stream' });
     }
-    // Only use the native share sheet when a FILE can actually be attached
-    // (mobile browsers). On desktop navigator.share opens the clunky Windows
-    // share sheet with no contact — so there we open the chat directly instead.
+    // Only use the native share sheet on a MOBILE browser that can attach a file.
+    // On desktop, navigator.canShare({files}) returns true (Windows) but only opens
+    // the clunky share sheet with no contact — so there we open the chat directly.
+    const isMobile = /Android|iPhone|iPad|iPod|Mobi/i.test(navigator.userAgent||'');
     const canShareFile = !!(file && navigator.canShare && navigator.canShare({ files:[file] }));
-    if(canShareFile && navigator.share){
+    if(isMobile && canShareFile && navigator.share){
       await navigator.share({ text: q.caption || '', files:[file] });
     } else {
       waOpenWhatsapp(q);   // desktop (and mobile without file-share): open the contact directly
@@ -1512,18 +1518,33 @@ function waOpenWhatsapp(q){
   const text = msg ? encodeURIComponent(msg) : '';
   if(q.target_type==='person' && q.target_number){
     const digits = q.target_number.replace(/\D/g,'');
-    window.open('https://wa.me/'+digits+(text?('?text='+text):''), '_blank');
-    toast('WhatsApp opened to '+(q.target_name||'the contact')+'. Review and Send, then tap “Mark sent”.','good');
+    // whatsapp:// opens the INSTALLED WhatsApp Desktop/mobile app directly to the
+    // chat with the text pre-filled. Fall back to wa.me (web) if the app isn't there.
+    const appUrl = 'whatsapp://send?phone='+digits+(text?('&text='+text):'');
+    // Trigger the installed WhatsApp app (Desktop or mobile) via a hidden iframe so
+    // our page never navigates away. If the app isn't installed, use the ↗ link toast.
+    try {
+      const f = document.createElement('iframe');
+      f.style.display='none'; f.src = appUrl; document.body.appendChild(f);
+      setTimeout(()=>{ try{ document.body.removeChild(f); }catch(e){} }, 3000);
+    } catch(e){ window.location.href = appUrl; }
+    state.lastWaWeb = 'https://wa.me/'+digits+(text?('?text='+text):'');
+    toast('Opening WhatsApp Desktop to '+(q.target_name||'the contact')+'. If nothing opens, tap the 📲 button again. Review & Send, then “Mark sent”.','good');
   } else {
-    // group: WhatsApp has no by-name deep link — copy caption + open WhatsApp Web
+    // group: WhatsApp has no by-name deep link — copy caption + open WhatsApp
     if(navigator.clipboard && q.caption) navigator.clipboard.writeText(q.caption).catch(()=>{});
     toast('Caption copied. Open WhatsApp, search the group "'+(q.target_name||'')+'", paste & send.','good');
-    window.open('https://web.whatsapp.com/', '_blank');
+    try { window.location.href = 'whatsapp://'; } catch(e){ window.open('https://web.whatsapp.com/', '_blank'); }
   }
 }
 async function waFired(id){
   if(!confirm('Mark this campaign as sent? Do this after you have tapped send in WhatsApp.')) return;
   try { await api('/api/fm/wa/'+id+'/fired',{method:'POST',json:{}}); toast('Marked sent','good'); renderWaFire(); }
+  catch(e){ toast(e.message,'bad'); }
+}
+async function waDelete(id, c){
+  if(!confirm('Delete "'+((c&&c.title)||'this campaign')+'" permanently? This cannot be undone.')) return;
+  try { await api('/api/fm/wa/'+id,{method:'DELETE'}); toast('Deleted','good'); renderWaFire(); }
   catch(e){ toast(e.message,'bad'); }
 }
 async function waAction(id, act){
@@ -1561,7 +1582,47 @@ function openWaModal(){
   if(fi){ fi.onchange = e => { if(e.target.files && e.target.files[0]) waUploadToDrive(e.target.files[0]); }; }
   waTargetChange();
   waModeChange();
+  // #1 — restore any draft saved before an app reload, then auto-save on every keystroke
+  waRestoreDraft();
+  try {
+    localStorage.setItem('fm_wa_open','1');
+    const mb = document.getElementById('modalBg');
+    if(mb){ mb.addEventListener('input', waSaveDraft); mb.addEventListener('change', waSaveDraft); }
+  } catch(e){}
 }
+function waFieldVal(id){ const el=document.getElementById(id); return el?el.value:undefined; }
+function waSaveDraft(){
+  try{
+    const d = {
+      title: waFieldVal('wa_title'), ttype: waFieldVal('wa_ttype'),
+      tname: waFieldVal('wa_tname'), tnum: waFieldVal('wa_tnum'),
+      media: waFieldVal('wa_media'), caption: waFieldVal('wa_caption'),
+      assign: waFieldVal('wa_assign'), mode: waFieldVal('wa_mode'),
+      when: waFieldVal('wa_when'), rt: waFieldVal('wa_rt'),
+      time: waFieldVal('wa_time'), end: waFieldVal('wa_end'), dom: waFieldVal('wa_dom'),
+      days: [...document.querySelectorAll('.wa_day:checked')].map(x=>x.value),
+      picked: state.waPicked || null
+    };
+    localStorage.setItem('fm_wa_draft', JSON.stringify(d));
+    localStorage.setItem('fm_wa_open','1');
+  }catch(e){}
+}
+function waRestoreDraft(){
+  let d=null; try{ d=JSON.parse(localStorage.getItem('fm_wa_draft')||'null'); }catch(e){}
+  if(!d) return;
+  const set=(id,v)=>{ const el=document.getElementById(id); if(el!=null && v!=null) el.value=v; };
+  set('wa_title',d.title);
+  if(d.ttype){ set('wa_ttype',d.ttype); waTargetChange(); }
+  set('wa_tname',d.tname); set('wa_tnum',d.tnum);
+  set('wa_media',d.media); set('wa_caption',d.caption); set('wa_assign',d.assign);
+  if(d.mode){ set('wa_mode',d.mode); waModeChange(); }
+  set('wa_when',d.when);
+  if(d.rt){ set('wa_rt',d.rt); waRepeatChange(); }
+  set('wa_time',d.time); set('wa_end',d.end); set('wa_dom',d.dom);
+  if(d.days && d.days.length){ d.days.forEach(v=>{ const c=document.querySelector('.wa_day[value="'+v+'"]'); if(c) c.checked=true; }); }
+  if(d.picked){ state.waPicked=d.picked; const mn=document.getElementById('wa_medianame'); if(mn) mn.textContent='📎 '+(d.picked.name||''); }
+}
+function waClearDraft(){ try{ localStorage.removeItem('fm_wa_draft'); localStorage.removeItem('fm_wa_open'); }catch(e){} }
 function waTargetChange(){
   const t = document.getElementById('wa_ttype').value;
   const box = document.getElementById('wa_target'); if(!box) return;
@@ -1705,6 +1766,7 @@ async function openDrivePicker(onPick){
 
 // ---------- ROUTER ----------
 function route(){
+  try { if(state.page) localStorage.setItem('fm_page', state.page); } catch(e){}
   switch(state.page){
     case 'dashboard': renderDashboard(); break;
     case 'lists': state.activeList?renderListDetail():renderLists(); break;
@@ -1751,7 +1813,11 @@ async function boot(){
     toast('Connection failed — please try again', 'bad');
     history.replaceState(null,'',location.pathname+location.search);
   }
-  state.page='dashboard'; route();
+  // Restore the last page the user was on (so a refresh stays put) — #3
+  let saved=''; try { saved = localStorage.getItem('fm_page')||''; } catch(e){}
+  const valid = ['dashboard','lists','instruction','campaigns','reports','email','wafire'];
+  state.page = valid.includes(saved) ? saved : 'dashboard';
+  route();
 }
 boot();
 </script>
