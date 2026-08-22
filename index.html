@@ -1421,7 +1421,7 @@ async function renderWaFire(){
 // running inside our custom native FM Fire app? (bridge injected)
 function inFireApp(){ try { return !!(window.AndroidFire && window.AndroidFire.isFireApp && window.AndroidFire.isFireApp()); } catch(e){ return false; } }
 // running inside an app wrapper (Median/GoNative) where the Google Drive PICKER can't log in?
-function inWrapper(){ try { return !!(window.median || window.gonative || /median|gonative|webview/i.test(navigator.userAgent||'')); } catch(e){ return false; } }
+function inWrapper(){ try { return inFireApp() || !!(window.AndroidFire || window.median || window.gonative || /median|gonative|webview|\bwv\b/i.test(navigator.userAgent||'')); } catch(e){ return false; } }
 // can this device attach-and-share? (Median app / mobile Chrome via Web Share, or our custom app)
 function canFire(){ return inFireApp() || !!navigator.share; }
 
