@@ -1464,6 +1464,37 @@ async function waFireInApp(q){
   }
 }
 
+// upload a phone/Drive-chosen file into the user's Google Drive (drive.file scope),
+// so big media lives in Drive and the fire can fetch it by id on any device.
+async function waUploadToDrive(file){
+  const nameEl = document.getElementById('wa_medianame');
+  const setMsg = t => { if(nameEl) nameEl.textContent = t; };
+  try {
+    const mb = (file.size/1048576).toFixed(1);
+    setMsg('⏫ Uploading “'+file.name+'” ('+mb+' MB) to your Drive…');
+    const tok = (await api('/api/fm/drive/token')).access_token;
+    const boundary = 'fmb'+Date.now();
+    const mime = file.type || 'application/octet-stream';
+    const body = new Blob([
+      '--'+boundary+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n',
+      JSON.stringify({ name: file.name, mimeType: mime }),
+      '\r\n--'+boundary+'\r\nContent-Type: '+mime+'\r\n\r\n',
+      file,
+      '\r\n--'+boundary+'--'
+    ]);
+    const r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType', {
+      method:'POST',
+      headers:{ Authorization:'Bearer '+tok, 'Content-Type':'multipart/related; boundary='+boundary },
+      body
+    });
+    if(!r.ok) throw new Error('Drive upload failed ('+r.status+')');
+    const d = await r.json();
+    state.waPicked = { id:d.id, name:d.name||file.name, mime:d.mimeType||mime };
+    const mEl = document.getElementById('wa_media'); if(mEl) mEl.value = 'https://drive.google.com/file/d/'+d.id+'/view';
+    setMsg('📎 '+(d.name||file.name)+' — saved to Drive, will attach on fire.');
+  } catch(e){ setMsg(''); toast('Upload failed: '+e.message,'bad'); }
+}
+
 function waOpenWhatsapp(q){
   if(!q) return;
   const text = q.caption ? encodeURIComponent(q.caption) : '';
@@ -1495,10 +1526,13 @@ function openWaModal(){
     <div id="wa_target"></div>
     <label class="field"><span>Video / file — optional (leave blank for a text-only message)</span>
       <div class="row" style="gap:8px;align-items:stretch">
-        <input class="input" id="wa_media" placeholder="Paste a link, or pick from Drive →" style="flex:1"/>
-        ${inWrapper() ? '' : '<button type="button" class="btn sm ghost" id="wa_drivebtn">📁 Drive</button>'}
+        <input class="input" id="wa_media" placeholder="Paste a link…" style="flex:1"/>
+        ${inWrapper()
+          ? '<button type="button" class="btn sm ghost" id="wa_attachbtn">📁 Drive / File</button>'
+          : '<button type="button" class="btn sm ghost" id="wa_drivebtn">📁 Drive</button>'}
       </div>
-      <div id="wa_medianame" style="font-size:12px;color:var(--ink-soft);margin-top:4px">${inWrapper() ? '📁 To attach a Drive video, create this campaign on a computer (the Drive picker needs a browser). Here you can still send text-only or fire campaigns already scheduled.' : ''}</div>
+      ${inWrapper() ? '<input type="file" id="wa_file" accept="video/*,image/*" style="display:none"/>' : ''}
+      <div id="wa_medianame" style="font-size:12px;color:var(--ink-soft);margin-top:4px">${inWrapper() ? 'Tap “Drive / File” → choose from your Google Drive (or phone). It saves to your Drive and attaches automatically when you fire.' : ''}</div>
     </label>
     <label class="field"><span>Caption / message</span><textarea class="input" id="wa_caption" rows="3" style="resize:vertical" placeholder="Good morning team! Today's targets attached."></textarea></label>
     <label class="field"><span>Assign to (who fires it) — optional</span><input class="input" id="wa_assign" placeholder="e.g. SG001 or 'Front desk tablet'"/></label>
@@ -1512,6 +1546,8 @@ function openWaModal(){
   state.waPicked = null;
   const db = document.getElementById('wa_drivebtn');
   if(db) db.onclick = () => openDrivePicker(d=>{ state.waPicked = { id:d.id, name:d.name, mime:d.mime }; document.getElementById('wa_media').value = d.url; document.getElementById('wa_medianame').textContent = '📎 '+d.name; });
+  const ab = document.getElementById('wa_attachbtn'), fi = document.getElementById('wa_file');
+  if(ab && fi){ ab.onclick = () => fi.click(); fi.onchange = e => { if(e.target.files && e.target.files[0]) waUploadToDrive(e.target.files[0]); }; }
   waTargetChange();
   waModeChange();
 }
