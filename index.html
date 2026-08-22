@@ -1528,10 +1528,9 @@ function openWaModal(){
       <div class="row" style="gap:8px;align-items:stretch">
         <input class="input" id="wa_media" placeholder="Paste a link…" style="flex:1"/>
         ${inWrapper()
-          ? '<button type="button" class="btn sm ghost" id="wa_attachbtn">📁 Drive / File</button>'
+          ? '<span style="position:relative;display:inline-block"><button type="button" class="btn sm ghost" id="wa_attachbtn" style="pointer-events:none">📁 Drive / File</button><input type="file" id="wa_file" accept="video/*,image/*" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer" title="Choose a video or photo"/></span>'
           : '<button type="button" class="btn sm ghost" id="wa_drivebtn">📁 Drive</button>'}
       </div>
-      ${inWrapper() ? '<input type="file" id="wa_file" accept="video/*,image/*" style="display:none"/>' : ''}
       <div id="wa_medianame" style="font-size:12px;color:var(--ink-soft);margin-top:4px">${inWrapper() ? 'Tap “Drive / File” → choose from your Google Drive (or phone). It saves to your Drive and attaches automatically when you fire.' : ''}</div>
     </label>
     <label class="field"><span>Caption / message</span><textarea class="input" id="wa_caption" rows="3" style="resize:vertical" placeholder="Good morning team! Today's targets attached."></textarea></label>
@@ -1546,8 +1545,8 @@ function openWaModal(){
   state.waPicked = null;
   const db = document.getElementById('wa_drivebtn');
   if(db) db.onclick = () => openDrivePicker(d=>{ state.waPicked = { id:d.id, name:d.name, mime:d.mime }; document.getElementById('wa_media').value = d.url; document.getElementById('wa_medianame').textContent = '📎 '+d.name; });
-  const ab = document.getElementById('wa_attachbtn'), fi = document.getElementById('wa_file');
-  if(ab && fi){ ab.onclick = () => fi.click(); fi.onchange = e => { if(e.target.files && e.target.files[0]) waUploadToDrive(e.target.files[0]); }; }
+  const fi = document.getElementById('wa_file');
+  if(fi){ fi.onchange = e => { if(e.target.files && e.target.files[0]) waUploadToDrive(e.target.files[0]); }; }
   waTargetChange();
   waModeChange();
 }
