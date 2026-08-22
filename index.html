@@ -889,7 +889,8 @@ async function renderCampaigns(){
     const { campaigns } = await api('/api/campaigns');
     const area=document.getElementById('campArea');
     if(!campaigns.length){ area.innerHTML=`<div class="empty"><h3>No campaigns yet</h3><p>Create your first instruction and set how often it goes out.</p><button class="btn" id="nc2">+ New instruction</button></div>`; document.getElementById('nc2').onclick=()=>{ state.page='instruction'; route(); }; return; }
-    area.innerHTML=`<div class="panel"><table><thead><tr><th>Campaign</th><th>List</th><th>Schedule</th><th>Status</th><th>Next run</th><th></th></tr></thead><tbody>
+    area.innerHTML=`<div class="row" style="justify-content:flex-end;margin:0 0 8px 0"><button class="btn sm danger" id="campBulkDel">🗑 Delete selected</button></div>
+      <div class="panel"><table><thead><tr><th style="width:34px"><input type="checkbox" id="campAll" title="Select all"/></th><th>Campaign</th><th>List</th><th>Schedule</th><th>Status</th><th>Next run</th><th></th></tr></thead><tbody>
       ${campaigns.map(campRow).join('')}</tbody></table></div>`;
     bindCampActions();
   } catch(e){ document.getElementById('campArea').innerHTML=`<div class="empty"><h3>Couldn't load</h3><p>${esc(e.message)}</p></div>`; }
@@ -911,6 +912,7 @@ function campRow(c){
   const next=c.next_run_at?new Date(c.next_run_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'—';
   const canStop=c.status==='running', canStart=c.status==='paused'||c.status==='draft';
   return `<tr>
+    <td><input type="checkbox" class="campchk" value="${c.id}"/></td>
     <td><b>${esc(c.name)}</b>${c.caption?`<div style="font-size:12px;color:var(--ink-soft);margin-top:2px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.caption)}</div>`:''}</td>
     <td>${esc(list)}</td>
     <td class="phone-cell">${freqLabel(c.frequency)}</td>
@@ -927,6 +929,16 @@ function bindCampActions(){
   document.querySelectorAll('[data-stop]').forEach(b=> b.onclick=()=>campStatus(b.dataset.stop,'paused'));
   document.querySelectorAll('[data-start]').forEach(b=> b.onclick=()=>campStatus(b.dataset.start,'running'));
   document.querySelectorAll('[data-delcamp]').forEach(b=> b.onclick=()=>campDelete(b.dataset.delcamp));
+  const all=document.getElementById('campAll');
+  if(all) all.onchange=()=>document.querySelectorAll('.campchk').forEach(c=>c.checked=all.checked);
+  const bd=document.getElementById('campBulkDel');
+  if(bd) bd.onclick=()=>campBulkDelete([...document.querySelectorAll('.campchk:checked')].map(c=>c.value));
+}
+async function campBulkDelete(ids){
+  if(!ids||!ids.length){ toast('Tick campaigns to delete first','bad'); return; }
+  if(!confirm('Delete '+ids.length+' campaign'+(ids.length===1?'':'s')+' permanently?')) return;
+  let ok=0; for(const id of ids){ try{ await api('/api/campaigns/'+id,{method:'DELETE'}); ok++; }catch(e){} }
+  toast('Deleted '+ok+' campaign'+(ok===1?'':'s'),'good'); renderCampaigns();
 }
 async function campStatus(id,status){ try{ await api(`/api/campaigns/${id}/status`,{method:'PATCH',json:{status}}); toast(status==='running'?'Campaign started':'Campaign paused','good'); renderCampaigns(); }catch(e){ toast(e.message,'bad'); } }
 async function campDelete(id){ try{ await api('/api/campaigns/'+id,{method:'DELETE'}); toast('Campaign deleted','good'); renderCampaigns(); }catch(e){ toast(e.message,'bad'); } }
@@ -1058,8 +1070,10 @@ function renderEmailList(st, cs){
         <div style="font-weight:700;overflow:hidden;text-overflow:ellipsis">📧 ${esc(st.email)}</div></div>
       <button class="btn sm ghost" id="emDisc">Disconnect</button>
     </div>
-    ${cs.length ? `<div class="panel"><table><thead><tr><th>Subject</th><th>Schedule</th><th>Recipients</th><th>Status</th><th>Next / last</th><th></th></tr></thead><tbody>
+    ${cs.length ? `<div class="row" style="justify-content:flex-end;margin:0 0 8px 0"><button class="btn sm danger" id="emBulkDel">🗑 Delete selected</button></div>
+      <div class="panel"><table><thead><tr><th style="width:34px"><input type="checkbox" id="emAll" title="Select all"/></th><th>Subject</th><th>Schedule</th><th>Recipients</th><th>Status</th><th>Next / last</th><th></th></tr></thead><tbody>
       ${cs.map(c=>`<tr>
+        <td><input type="checkbox" class="emchk" value="${c.id}"/></td>
         <td><b>${esc(c.subject)}</b></td>
         <td class="phone-cell">${repeat(c)}</td>
         <td>${c.recipient_count}</td>
@@ -1070,6 +1084,7 @@ function renderEmailList(st, cs){
           ${c.status==='paused'?`<button class="btn sm" data-emresume="${c.id}">Resume</button>`:''}
           ${['active','paused'].includes(c.status)?`<button class="btn sm danger" data-emstop="${c.id}">Stop</button>`:''}
           <button class="btn sm ghost" data-emhist="${c.id}">History</button>
+          <button class="icon-btn del" data-emdel="${c.id}" title="Delete">🗑</button>
         </div></td>
       </tr>`).join('')}
     </tbody></table></div>` : `<div class="empty"><h3>No automations yet</h3><p>Create your first email — send now, once, or on a recurring schedule.</p></div>`}
@@ -1079,6 +1094,22 @@ function renderEmailList(st, cs){
   document.querySelectorAll('[data-emresume]').forEach(b=> b.onclick=()=>emailAction(b.dataset.emresume,'resume'));
   document.querySelectorAll('[data-emstop]').forEach(b=> b.onclick=()=>emailAction(b.dataset.emstop,'stop'));
   document.querySelectorAll('[data-emhist]').forEach(b=> b.onclick=()=>emailHistory(b.dataset.emhist));
+  document.querySelectorAll('[data-emdel]').forEach(b=> b.onclick=()=>emailDelete(b.dataset.emdel));
+  const emAll=document.getElementById('emAll');
+  if(emAll) emAll.onchange=()=>document.querySelectorAll('.emchk').forEach(c=>c.checked=emAll.checked);
+  const emBd=document.getElementById('emBulkDel');
+  if(emBd) emBd.onclick=()=>emailBulkDelete([...document.querySelectorAll('.emchk:checked')].map(c=>c.value));
+}
+async function emailDelete(id){
+  if(!confirm('Delete this email automation permanently? This cannot be undone.')) return;
+  try{ await api('/api/fm/email/'+id,{method:'DELETE'}); toast('Deleted','good'); renderEmail(); }
+  catch(e){ toast(e.message,'bad'); }
+}
+async function emailBulkDelete(ids){
+  if(!ids||!ids.length){ toast('Tick emails to delete first','bad'); return; }
+  if(!confirm('Delete '+ids.length+' email automation'+(ids.length===1?'':'s')+' permanently?')) return;
+  let ok=0; for(const id of ids){ try{ await api('/api/fm/email/'+id,{method:'DELETE'}); ok++; }catch(e){} }
+  toast('Deleted '+ok,'good'); renderEmail();
 }
 
 async function emailConnect(){
@@ -1394,9 +1425,10 @@ async function renderWaFire(){
         </tr>`).join('')}
         </tbody></table></div>`;
     }
-    html += `<div class="h2" style="margin:0 0 8px 4px;font-size:15px">All campaigns (${campaigns.length})</div>`;
-    html += campaigns.length ? `<div class="panel"><table><thead><tr><th>Campaign</th><th>Target</th><th>Schedule</th><th>Status</th><th>Next / last</th><th></th></tr></thead><tbody>
+    html += `<div class="row" style="justify-content:space-between;align-items:center;margin:0 0 8px 4px"><div class="h2" style="font-size:15px">All campaigns (${campaigns.length})</div>${campaigns.length?`<button class="btn sm danger" id="waBulkDel">🗑 Delete selected</button>`:''}</div>`;
+    html += campaigns.length ? `<div class="panel"><table><thead><tr><th style="width:34px"><input type="checkbox" id="waAll" title="Select all"/></th><th>Campaign</th><th>Target</th><th>Schedule</th><th>Status</th><th>Next / last</th><th></th></tr></thead><tbody>
       ${campaigns.map(c=>`<tr>
+        <td><input type="checkbox" class="wachk" value="${c.id}"/></td>
         <td><b>${esc(c.title)}</b>${c.caption?`<div style="font-size:12px;color:var(--ink-soft);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.caption)}</div>`:''}</td>
         <td>${c.target_type==='person'?'👤':'👥'} ${esc(c.target_name)}</td>
         <td class="phone-cell">${waRepeatLabel(c)}</td>
@@ -1416,6 +1448,10 @@ async function renderWaFire(){
     area.querySelectorAll('[data-wastop]').forEach(b=> b.onclick=()=>waAction(b.dataset.wastop,'stop'));
     area.querySelectorAll('[data-waresume]').forEach(b=> b.onclick=()=>waAction(b.dataset.waresume,'resume'));
     area.querySelectorAll('[data-wadel]').forEach(b=> b.onclick=()=>waDelete(b.dataset.wadel, (campaigns||[]).find(x=>x.id===b.dataset.wadel)));
+    const allCb = document.getElementById('waAll');
+    if(allCb) allCb.onchange = ()=> area.querySelectorAll('.wachk').forEach(c=> c.checked = allCb.checked);
+    const bulk = document.getElementById('waBulkDel');
+    if(bulk) bulk.onclick = ()=> waBulkDelete([...area.querySelectorAll('.wachk:checked')].map(c=>c.value));
   } catch(e){
     area.innerHTML = `<div class="empty"><h3>Couldn't load</h3><p>${esc(e.message)}</p></div>`;
   }
@@ -1478,6 +1514,19 @@ async function waFireInApp(q){
   }
 }
 
+// Make a Drive file readable by anyone with the link, so mass recipients can open
+// the media link WITHOUT a "Request access" step. (drive.file scope covers files
+// our app created or the user picked.)
+async function driveMakePublic(id, tok){
+  try{
+    await fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'/permissions', {
+      method:'POST',
+      headers:{ Authorization:'Bearer '+tok, 'Content-Type':'application/json' },
+      body: JSON.stringify({ role:'reader', type:'anyone' })
+    });
+  }catch(e){ /* best-effort */ }
+}
+
 // upload a phone/Drive-chosen file into the user's Google Drive (drive.file scope),
 // so big media lives in Drive and the fire can fetch it by id on any device.
 async function waUploadToDrive(file){
@@ -1503,9 +1552,10 @@ async function waUploadToDrive(file){
     });
     if(!r.ok) throw new Error('Drive upload failed ('+r.status+')');
     const d = await r.json();
+    await driveMakePublic(d.id, tok);   // so the link opens for everyone, no access request
     state.waPicked = { id:d.id, name:d.name||file.name, mime:d.mimeType||mime };
     const mEl = document.getElementById('wa_media'); if(mEl) mEl.value = 'https://drive.google.com/file/d/'+d.id+'/view';
-    setMsg('📎 '+(d.name||file.name)+' — saved to Drive, will attach on fire.');
+    setMsg('📎 '+(d.name||file.name)+' — saved to Drive (shareable), will attach on fire.');
   } catch(e){ setMsg(''); toast('Upload failed: '+e.message,'bad'); }
 }
 
@@ -1546,6 +1596,103 @@ async function waDelete(id, c){
   if(!confirm('Delete "'+((c&&c.title)||'this campaign')+'" permanently? This cannot be undone.')) return;
   try { await api('/api/fm/wa/'+id,{method:'DELETE'}); toast('Deleted','good'); renderWaFire(); }
   catch(e){ toast(e.message,'bad'); }
+}
+async function waBulkDelete(ids){
+  if(!ids || !ids.length){ toast('Tick the campaigns you want to delete first','bad'); return; }
+  if(!confirm('Delete '+ids.length+' campaign'+(ids.length===1?'':'s')+' permanently? This cannot be undone.')) return;
+  let ok=0;
+  for(const id of ids){ try{ await api('/api/fm/wa/'+id,{method:'DELETE'}); ok++; }catch(e){} }
+  toast('Deleted '+ok+' campaign'+(ok===1?'':'s'),'good');
+  renderWaFire();
+}
+
+// ----- WhatsApp contacts master (autocomplete source + import) -----
+async function openWaContactsModal(){
+  showModal(`<h3>WhatsApp contacts</h3><p class="msub">Saved people — new ones are added automatically when you schedule a person campaign.</p>
+    <div class="row" style="gap:6px;margin-bottom:8px">
+      <input class="input" id="wc_name" placeholder="Name (optional)" style="flex:1"/>
+      <input class="input" id="wc_num" placeholder="98765 43210" inputmode="numeric" style="flex:1"/>
+      <button class="btn sm" id="wc_add">Add</button>
+    </div>
+    <div class="row" style="gap:10px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
+      <button class="btn sm ghost" id="wc_up">⬆ Upload Excel / CSV</button>
+      <a href="#" id="wc_tmpl" style="font-size:12px;color:var(--accent,#D65A1E)">Download sample template</a>
+      <input type="file" id="wc_file" accept=".xlsx,.xls,.csv" style="display:none"/>
+    </div>
+    <div id="wc_list" style="max-height:300px;overflow:auto"><div class="loading">Loading…</div></div>
+    <div class="modal-actions"><button class="btn ghost" id="mc">Close</button></div>`);
+  document.getElementById('mc').onclick = closeModal;
+  document.getElementById('wc_up').onclick = ()=>document.getElementById('wc_file').click();
+  document.getElementById('wc_file').onchange = e=>{ if(e.target.files[0]) wcUpload(e.target.files[0]); e.target.value=''; };
+  document.getElementById('wc_tmpl').onclick = e=>{ e.preventDefault(); wcTemplate(); };
+  document.getElementById('wc_add').onclick = async ()=>{
+    const name=document.getElementById('wc_name').value.trim();
+    const number=document.getElementById('wc_num').value.trim();
+    if(number.replace(/\D/g,'').length<10){ toast('Enter a valid phone number','bad'); return; }
+    try{ await api('/api/fm/wa/contacts',{method:'POST',json:{name,number}}); document.getElementById('wc_name').value=''; document.getElementById('wc_num').value=''; loadWaContacts(); }
+    catch(e){ toast(e.message,'bad'); }
+  };
+  loadWaContacts();
+}
+async function loadWaContacts(){
+  const box=document.getElementById('wc_list'); if(!box) return;
+  try{
+    const { contacts } = await api('/api/fm/wa/contacts?all=1');
+    box.innerHTML = contacts.length
+      ? contacts.map(c=>`<div class="row" style="justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f2ede8"><div style="min-width:0">${c.name?`<b>${esc(c.name)}</b> `:''}<span style="color:var(--ink-soft)">+${esc(c.number)}</span></div><button class="btn sm ghost" data-wcdel="${c.id}">Delete</button></div>`).join('')
+      : `<div style="color:var(--ink-soft);padding:12px 0">No contacts yet — they'll appear here automatically as you schedule person campaigns, or add/import above.</div>`;
+    box.querySelectorAll('[data-wcdel]').forEach(b=> b.onclick=async ()=>{ try{ await api('/api/fm/wa/contacts/'+b.dataset.wcdel,{method:'DELETE'}); loadWaContacts(); }catch(e){ toast(e.message,'bad'); } });
+  }catch(e){ box.innerHTML=`<div style="color:var(--stop)">${esc(e.message)}</div>`; }
+}
+async function wcUpload(file){
+  try{
+    const contacts = (await parseWaContactsFile(file)).filter(r=>r.number);
+    if(!contacts.length){ toast('No valid Name/Number rows found in that file','bad'); return; }
+    await api('/api/fm/wa/contacts/bulk',{method:'POST',json:{contacts}});
+    toast('Imported '+contacts.length+' contact'+(contacts.length===1?'':'s'),'good');
+    loadWaContacts();
+  }catch(e){ toast('Import failed: '+e.message,'bad'); }
+}
+async function parseWaContactsFile(file){
+  const buf = await file.arrayBuffer();
+  if(/\.csv$/i.test(file.name)) return parseCsvWaContacts(new TextDecoder().decode(buf));
+  if(!window.XLSX) throw new Error('spreadsheet reader not loaded — check your connection and retry');
+  const wb = XLSX.read(buf,{type:'array'});
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  return mapWaContactRows(XLSX.utils.sheet_to_json(ws,{defval:''}));
+}
+function mapWaContactRows(json){
+  return json.map(r=>{
+    const keys=Object.keys(r);
+    const nk=keys.find(k=>/name/i.test(k));
+    const pk=keys.find(k=>/(number|mobile|phone|whatsapp|contact)/i.test(k));
+    let name = nk?String(r[nk]).trim():'';
+    let number = pk?String(r[pk]).trim():'';
+    if(!number){ for(const k of keys){ const v=String(r[k]||'').replace(/\D/g,''); if(v.length>=10) number=String(r[k]).trim(); else if(!name) name=String(r[k]).trim(); } }
+    return { name:name||null, number };
+  }).filter(r=>r.number && r.number.replace(/\D/g,'').length>=10);
+}
+function parseCsvWaContacts(text){
+  const lines=text.split(/\r?\n/).filter(l=>l.trim());
+  if(!lines.length) return [];
+  const hasHeader=/name|number|mobile|phone|whatsapp/i.test(lines[0]);
+  return (hasHeader?lines.slice(1):lines).map(l=>{
+    const parts=l.split(',').map(s=>s.trim().replace(/^"|"$/g,''));
+    const number=parts.find(p=>p.replace(/\D/g,'').length>=10)||'';
+    const name=parts.filter(p=>p!==number).join(' ').trim();
+    return { name:name||null, number };
+  }).filter(r=>r.number);
+}
+function wcTemplate(){
+  const rows=[['Name','Number'],['Rakesh Sharma','9876543210'],['Priya Verma','9123456780']];
+  if(window.XLSX){
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+    const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Contacts');
+    XLSX.writeFile(wb,'whatsapp_contacts_template.xlsx');
+  } else {
+    const csv=rows.map(r=>r.join(',')).join('\n');
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='whatsapp_contacts_template.csv'; a.click(); URL.revokeObjectURL(a.href);
+  }
 }
 async function waAction(id, act){
   try { await api('/api/fm/wa/'+id+'/'+act,{method:'POST',json:{}}); toast('Done','good'); renderWaFire(); }
@@ -1626,9 +1773,42 @@ function waClearDraft(){ try{ localStorage.removeItem('fm_wa_draft'); localStora
 function waTargetChange(){
   const t = document.getElementById('wa_ttype').value;
   const box = document.getElementById('wa_target'); if(!box) return;
-  box.innerHTML = t==='person'
-    ? `<label class="field"><span>Person's name</span><input class="input" id="wa_tname" placeholder="Rakesh Sharma"/></label><label class="field"><span>Mobile number (India +91 — just the 10 digits)</span><input class="input" id="wa_tnum" placeholder="98765 43210" inputmode="numeric"/></label>`
-    : `<label class="field"><span>Exact WhatsApp group name</span><input class="input" id="wa_tname" placeholder="GOGAS Field Team"/></label>`;
+  if(t==='person'){
+    box.innerHTML = `<label class="field"><span>Person's name</span>
+        <div class="em-tobox">
+          <input class="input" id="wa_tname" placeholder="Type a saved name — or a new one…" autocomplete="off"/>
+          <div id="wa_dd" class="em-dd" style="display:none"></div>
+        </div></label>
+      <label class="field"><span>Mobile number (India +91 — just the 10 digits)</span><input class="input" id="wa_tnum" placeholder="98765 43210" inputmode="numeric"/></label>
+      <div style="margin:-4px 0 4px 2px"><a href="#" id="wa_contacts_link" style="font-size:12px;color:var(--accent,#D65A1E)">📇 Manage / import WhatsApp contacts</a></div>`;
+    const nm = document.getElementById('wa_tname'); if(nm) nm.oninput = waContactSearch;
+    const lk = document.getElementById('wa_contacts_link'); if(lk) lk.onclick = e=>{ e.preventDefault(); openWaContactsModal(); };
+  } else {
+    box.innerHTML = `<label class="field"><span>Exact WhatsApp group name</span><input class="input" id="wa_tname" placeholder="GOGAS Field Team"/></label>`;
+  }
+}
+let waSearchTimer=null;
+function waContactSearch(e){
+  const q = e.target.value.trim();
+  const dd = document.getElementById('wa_dd'); if(!dd) return;
+  clearTimeout(waSearchTimer);
+  if(!q){ dd.style.display='none'; dd.innerHTML=''; return; }
+  waSearchTimer = setTimeout(async ()=>{
+    try{
+      const { contacts } = await api('/api/fm/wa/contacts?q='+encodeURIComponent(q));
+      if(!contacts || !contacts.length){ dd.style.display='none'; dd.innerHTML=''; return; }
+      dd.innerHTML = contacts.map(c=>`<div class="em-opt" data-num="${esc(c.number)}" data-nm="${esc(c.name||'')}">${c.name?`<b>${esc(c.name)}</b> `:''}<span style="color:var(--ink-soft)">+${esc(c.number)}</span></div>`).join('');
+      dd.style.display='block';
+      dd.querySelectorAll('[data-num]').forEach(o=> o.onclick=()=>{
+        const nmEl=document.getElementById('wa_tname'), numEl=document.getElementById('wa_tnum');
+        if(nmEl) nmEl.value = o.dataset.nm||'';
+        const num = o.dataset.num||'';
+        if(numEl) numEl.value = num.length>10 ? num.slice(-10) : num;
+        dd.style.display='none'; dd.innerHTML='';
+        if(typeof waSaveDraft==='function') waSaveDraft();
+      });
+    }catch{ dd.style.display='none'; }
+  }, 200);
 }
 function waModeChange(){
   const mode = document.getElementById('wa_mode').value;
@@ -1756,6 +1936,7 @@ async function openDrivePicker(onPick){
       .setCallback(data=>{
         if(data.action===google.picker.Action.PICKED && data.docs && data.docs[0]){
           const d = data.docs[0];
+          driveMakePublic(d.id, token);   // so the shared link opens for everyone
           onPick({ id:d.id, name:d.name, mime:d.mimeType||'', url:d.url || ('https://drive.google.com/file/d/'+d.id+'/view') });
         }
       })
