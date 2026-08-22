@@ -1907,7 +1907,12 @@ function renderDriveCard(){
   const box = document.getElementById('dashDrive'); if(!box) return;
   box.innerHTML = `<div class="panel" style="padding:16px"><div class="loading">Checking Drive…</div></div>`;
   api('/api/fm/drive/status').then(st=>{
-    box.innerHTML = st.connected
+    box.innerHTML = (st.connected && st.shared)
+      ? `<div class="panel" style="padding:16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+           <div style="min-width:0"><div style="font-size:12px;color:var(--ink-soft)">Using company Drive (set up by your admin)</div><div style="font-weight:700">📁 ${esc(st.email)}</div></div>
+           <button class="btn sm ghost" id="drvChange" title="Connect your own Drive instead">Use my own Drive</button>
+         </div>`
+      : st.connected
       ? `<div class="panel" style="padding:16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
            <div style="min-width:0"><div style="font-size:12px;color:var(--ink-soft)">Google Drive connected</div><div style="font-weight:700">📁 ${esc(st.email)}</div></div>
            <div style="display:flex;gap:8px"><button class="btn sm ghost" id="drvChange">Change</button><button class="btn sm ghost" id="drvOff">Disconnect</button></div>
@@ -2010,6 +2015,7 @@ function openUserModal(){
     <label class="field"><span>Short ID / code <span style="font-weight:400;text-transform:none">(internal reference)</span></span><input class="input" id="u_code" placeholder="rakesh01"/></label>
     <label class="field"><span>Mobile <span style="font-weight:400;text-transform:none">(optional)</span></span><input class="input" id="u_phone" placeholder="98765 43210" inputmode="numeric"/></label>
     <label class="field"><span>Role</span><select class="input" id="u_role"><option value="employee">Employee</option><option value="broadcaster">Broadcaster</option><option value="admin">Admin</option><option value="super_admin">Super Admin</option></select></label>
+    <label class="field"><span>Drive access</span><select class="input" id="u_drive"><option value="shared">Company Drive (shared) — nothing to set up</option><option value="own">Their own Google Drive (they connect it)</option></select></label>
     <label class="field"><span>Temporary password</span><input class="input" id="u_pass" placeholder="At least 6 characters"/></label>
     <div class="err" id="u_err"></div>
     <div class="modal-actions"><button class="btn ghost" id="mc">Cancel</button><button class="btn" id="mok">Create user</button></div>`);
@@ -2022,6 +2028,7 @@ function openUserModal(){
     let code=document.getElementById('u_code').value.trim();
     const phone=document.getElementById('u_phone').value.trim();
     const platform_role=document.getElementById('u_role').value;
+    const drive_mode=document.getElementById('u_drive').value;
     const password=document.getElementById('u_pass').value;
     const err=document.getElementById('u_err');
     if(!name){ err.textContent='Name is required.'; return; }
@@ -2029,7 +2036,7 @@ function openUserModal(){
     if(!code) code = email.split('@')[0].replace(/[^a-z0-9]/gi,'').toLowerCase().slice(0,20) || ('u'+Date.now().toString().slice(-6));
     if(password.length<6){ err.textContent='Password must be at least 6 characters.'; return; }
     const btn=document.getElementById('mok'); btn.disabled=true; btn.textContent='Creating…';
-    try{ await api('/api/fm/users',{method:'POST',json:{name,email,code,phone,platform_role,password}}); closeModal(); toast('User created','good'); renderUsers(); }
+    try{ await api('/api/fm/users',{method:'POST',json:{name,email,code,phone,platform_role,drive_mode,password}}); closeModal(); toast('User created','good'); renderUsers(); }
     catch(e){ btn.disabled=false; btn.textContent='Create user'; err.textContent=e.message; }
   };
 }
@@ -2043,6 +2050,10 @@ function openUserEdit(u){
     <label class="field"><span>Role</span><select class="input" id="ue_role">
       ${['employee','broadcaster','admin','super_admin'].map(r=>`<option value="${r}" ${u.platform_role===r?'selected':''}>${ROLE_LABEL[r]}</option>`).join('')}
     </select></label>
+    <label class="field"><span>Drive access</span><select class="input" id="ue_drive">
+      <option value="shared" ${(!u.features||u.features.drive_mode!=='own')?'selected':''}>Company Drive (shared)</option>
+      <option value="own" ${(u.features&&u.features.drive_mode==='own')?'selected':''}>Their own Google Drive</option>
+    </select></label>
     <div class="err" id="ue_err"></div>
     <div class="modal-actions"><button class="btn ghost" id="mc">Cancel</button><button class="btn" id="mok">Save</button></div>`);
   document.getElementById('mc').onclick = closeModal;
@@ -2052,6 +2063,7 @@ function openUserEdit(u){
       email:document.getElementById('ue_email').value.trim(),
       phone:document.getElementById('ue_phone').value.trim(),
       platform_role:document.getElementById('ue_role').value,
+      drive_mode:document.getElementById('ue_drive').value,
     };
     const btn=document.getElementById('mok'); btn.disabled=true; btn.textContent='Saving…';
     try{ await api('/api/fm/users/'+u.id,{method:'PATCH',json:patch}); closeModal(); toast('Saved','good'); renderUsers(); }
