@@ -478,6 +478,8 @@ function renderLogin(errMsg){
 }
 
 // ---------- SHELL ----------
+function isSuperAdmin(){ return state.fmProfile && state.fmProfile.platform_role==='super_admin'; }
+function pageVisible(id){ return isSuperAdmin() || !state.features || state.features['page_'+id] !== false; }
 function navItem(id, label){ return `<button class="nav-item ${state.page===id?'active':''}" data-nav="${id}"><span class="dot"></span>${label}</button>`; }
 function renderShell(inner){
   const p = state.profile || {};
@@ -490,13 +492,14 @@ function renderShell(inner){
     <div class="scrim" id="mScrim"></div>
     <aside class="side" id="mSide">
       <div class="brand">${FM_MARK(30)}<div class="brand-name" style="color:#fff">Future Makers</div></div>
-      ${navItem('dashboard','Dashboard')}
-      ${navItem('instruction','New Instruction')}
-      ${navItem('campaigns','Campaigns')}
-      ${navItem('lists','Broadcast Lists')}
-      ${navItem('reports','Campaign Reports')}
-      ${navItem('email','Email Automation')}
-      ${navItem('wafire','WhatsApp Fire')}
+      ${pageVisible('dashboard')?navItem('dashboard','Dashboard'):''}
+      ${pageVisible('instruction')?navItem('instruction','New Instruction'):''}
+      ${pageVisible('campaigns')?navItem('campaigns','Campaigns'):''}
+      ${pageVisible('lists')?navItem('lists','Broadcast Lists'):''}
+      ${pageVisible('reports')?navItem('reports','Campaign Reports'):''}
+      ${pageVisible('email')?navItem('email','Email Automation'):''}
+      ${pageVisible('wafire')?navItem('wafire','WhatsApp Fire'):''}
+      ${isSuperAdmin()?navItem('users','👥 User Management'):''}
       <div class="side-foot">
         <div class="who-row">
           <div class="who"><b>${esc(p.name||p.email||'User')}</b>${esc(p.email||'')}<br/><span class="role-tag">${esc((p.role||'user').replace('_',' '))}</span></div>
@@ -1945,6 +1948,161 @@ async function openDrivePicker(onPick){
   });
 }
 
+// ================= USER MANAGEMENT (super admin) =================
+const FM_PAGES = [
+  ['page_dashboard','Dashboard'],['page_instruction','New Instruction'],
+  ['page_campaigns','Campaigns'],['page_lists','Broadcast Lists'],
+  ['page_reports','Campaign Reports'],['page_email','Email Automation'],
+  ['page_wafire','WhatsApp Fire'],
+];
+const ROLE_LABEL = { super_admin:'Super Admin', admin:'Admin', broadcaster:'Broadcaster', employee:'Employee' };
+
+async function renderUsers(){
+  renderShell(`<div class="page-head">
+    <div><div class="eyebrow">Administration</div><h2>User Management</h2><p>Create users, control which pages each one sees, reset passwords, and manage access.</p></div>
+    <div class="row" style="gap:8px"><button class="btn ghost" id="usrRefresh">↻ Refresh</button><button class="btn" id="usrNew">+ New user</button></div>
+  </div><div id="usrArea"><div class="loading">Loading users…</div></div>`);
+  document.getElementById('usrNew').onclick = ()=>openUserModal();
+  document.getElementById('usrRefresh').onclick = ()=>renderUsers();
+  const area = document.getElementById('usrArea');
+  try{
+    const { users } = await api('/api/fm/users');
+    state.usersCache = users;
+    if(!users.length){ area.innerHTML = `<div class="empty"><h3>No users yet</h3><p>Create your first user with the button above.</p></div>`; return; }
+    area.innerHTML = `<div class="panel" style="overflow-x:auto"><table><thead><tr><th>Name</th><th>Login</th><th>Role</th><th>Pages</th><th>Status</th><th></th></tr></thead><tbody>
+      ${users.map(u=>{
+        const pages = FM_PAGES.filter(([k])=> (u.features||{})[k] !== false).length;
+        const me = state.fmProfile && u.id===state.fmProfile.id;
+        return `<tr>
+          <td><b>${esc(u.name||'—')}</b></td>
+          <td>${esc(u.email||(u.code+'@fm.internal'))}<div style="font-size:12px;color:var(--ink-soft)">code: ${esc(u.code)}</div></td>
+          <td>${esc(ROLE_LABEL[u.platform_role]||u.platform_role)}</td>
+          <td>${pages}/${FM_PAGES.length}</td>
+          <td>${u.is_active===false?'<span class="opt-pill opt-no"><span class="opt-dot"></span>Inactive</span>':'<span class="opt-pill opt-yes"><span class="opt-dot"></span>Active</span>'}</td>
+          <td><div class="row-actions">
+            <button class="btn sm ghost" data-uedit="${u.id}">Edit</button>
+            <button class="btn sm ghost" data-upages="${u.id}">Pages</button>
+            <button class="btn sm ghost" data-upass="${u.id}">Reset PW</button>
+            ${me?'':`<button class="btn sm ghost" data-utog="${u.id}">${u.is_active===false?'Activate':'Deactivate'}</button>`}
+            ${me?'':`<button class="icon-btn del" data-udel="${u.id}" title="Delete">🗑</button>`}
+          </div></td>
+        </tr>`;
+      }).join('')}
+    </tbody></table></div>`;
+    const find = id => (state.usersCache||[]).find(x=>x.id===id);
+    area.querySelectorAll('[data-uedit]').forEach(b=> b.onclick=()=>openUserEdit(find(b.dataset.uedit)));
+    area.querySelectorAll('[data-upages]').forEach(b=> b.onclick=()=>openUserPages(find(b.dataset.upages)));
+    area.querySelectorAll('[data-upass]').forEach(b=> b.onclick=()=>openUserReset(find(b.dataset.upass)));
+    area.querySelectorAll('[data-utog]').forEach(b=> b.onclick=()=>userToggleActive(find(b.dataset.utog)));
+    area.querySelectorAll('[data-udel]').forEach(b=> b.onclick=()=>userDelete(find(b.dataset.udel)));
+  }catch(e){ area.innerHTML = `<div class="empty"><h3>Couldn't load</h3><p>${esc(e.message)}</p></div>`; }
+}
+
+function openUserModal(){
+  showModal(`<h3>New user</h3><p class="msub">They'll sign in with their email and the password you set here.</p>
+    <label class="field"><span>Full name</span><input class="input" id="u_name" placeholder="Rakesh Sharma"/></label>
+    <label class="field"><span>Login email</span><input class="input" id="u_email" type="email" placeholder="rakesh@confidencegroup.co" autocomplete="off"/></label>
+    <label class="field"><span>Short ID / code <span style="font-weight:400;text-transform:none">(internal reference)</span></span><input class="input" id="u_code" placeholder="rakesh01"/></label>
+    <label class="field"><span>Mobile <span style="font-weight:400;text-transform:none">(optional)</span></span><input class="input" id="u_phone" placeholder="98765 43210" inputmode="numeric"/></label>
+    <label class="field"><span>Role</span><select class="input" id="u_role"><option value="employee">Employee</option><option value="broadcaster">Broadcaster</option><option value="admin">Admin</option><option value="super_admin">Super Admin</option></select></label>
+    <label class="field"><span>Temporary password</span><input class="input" id="u_pass" placeholder="At least 6 characters"/></label>
+    <div class="err" id="u_err"></div>
+    <div class="modal-actions"><button class="btn ghost" id="mc">Cancel</button><button class="btn" id="mok">Create user</button></div>`);
+  document.getElementById('mc').onclick = closeModal;
+  const emailEl = document.getElementById('u_email'), codeEl = document.getElementById('u_code');
+  emailEl.onblur = ()=>{ if(!codeEl.value && emailEl.value.includes('@')) codeEl.value = emailEl.value.split('@')[0].replace(/[^a-z0-9]/gi,'').toLowerCase().slice(0,20); };
+  document.getElementById('mok').onclick = async ()=>{
+    const name=document.getElementById('u_name').value.trim();
+    const email=document.getElementById('u_email').value.trim();
+    let code=document.getElementById('u_code').value.trim();
+    const phone=document.getElementById('u_phone').value.trim();
+    const platform_role=document.getElementById('u_role').value;
+    const password=document.getElementById('u_pass').value;
+    const err=document.getElementById('u_err');
+    if(!name){ err.textContent='Name is required.'; return; }
+    if(!email.includes('@')){ err.textContent='A valid login email is required.'; return; }
+    if(!code) code = email.split('@')[0].replace(/[^a-z0-9]/gi,'').toLowerCase().slice(0,20) || ('u'+Date.now().toString().slice(-6));
+    if(password.length<6){ err.textContent='Password must be at least 6 characters.'; return; }
+    const btn=document.getElementById('mok'); btn.disabled=true; btn.textContent='Creating…';
+    try{ await api('/api/fm/users',{method:'POST',json:{name,email,code,phone,platform_role,password}}); closeModal(); toast('User created','good'); renderUsers(); }
+    catch(e){ btn.disabled=false; btn.textContent='Create user'; err.textContent=e.message; }
+  };
+}
+
+function openUserEdit(u){
+  if(!u) return;
+  showModal(`<h3>Edit ${esc(u.name||u.code)}</h3>
+    <label class="field"><span>Full name</span><input class="input" id="ue_name" value="${esc(u.name||'')}"/></label>
+    <label class="field"><span>Contact email</span><input class="input" id="ue_email" value="${esc(u.email||'')}"/></label>
+    <label class="field"><span>Mobile</span><input class="input" id="ue_phone" value="${esc(u.phone||'')}"/></label>
+    <label class="field"><span>Role</span><select class="input" id="ue_role">
+      ${['employee','broadcaster','admin','super_admin'].map(r=>`<option value="${r}" ${u.platform_role===r?'selected':''}>${ROLE_LABEL[r]}</option>`).join('')}
+    </select></label>
+    <div class="err" id="ue_err"></div>
+    <div class="modal-actions"><button class="btn ghost" id="mc">Cancel</button><button class="btn" id="mok">Save</button></div>`);
+  document.getElementById('mc').onclick = closeModal;
+  document.getElementById('mok').onclick = async ()=>{
+    const patch = {
+      name:document.getElementById('ue_name').value.trim(),
+      email:document.getElementById('ue_email').value.trim(),
+      phone:document.getElementById('ue_phone').value.trim(),
+      platform_role:document.getElementById('ue_role').value,
+    };
+    const btn=document.getElementById('mok'); btn.disabled=true; btn.textContent='Saving…';
+    try{ await api('/api/fm/users/'+u.id,{method:'PATCH',json:patch}); closeModal(); toast('Saved','good'); renderUsers(); }
+    catch(e){ btn.disabled=false; btn.textContent='Save'; document.getElementById('ue_err').textContent=e.message; }
+  };
+}
+
+function openUserPages(u){
+  if(!u) return;
+  const f = u.features||{};
+  showModal(`<h3>Page access — ${esc(u.name||u.code)}</h3><p class="msub">Tick the pages this user can open. Unticked pages are hidden from their menu.</p>
+    <div style="display:flex;flex-direction:column;gap:10px;margin:10px 0 4px">
+      ${FM_PAGES.map(([k,label])=>`<label style="display:flex;align-items:center;gap:10px;font-size:14px"><input type="checkbox" class="pgchk" data-k="${k}" ${f[k]!==false?'checked':''}/> ${label}</label>`).join('')}
+    </div>
+    <div class="err" id="pg_err"></div>
+    <div class="modal-actions"><button class="btn ghost" id="mc">Cancel</button><button class="btn" id="mok">Save access</button></div>`);
+  document.getElementById('mc').onclick = closeModal;
+  document.getElementById('mok').onclick = async ()=>{
+    const pages={};
+    document.querySelectorAll('.pgchk').forEach(c=> pages[c.dataset.k]=c.checked);
+    const btn=document.getElementById('mok'); btn.disabled=true; btn.textContent='Saving…';
+    try{ await api('/api/fm/users/'+u.id+'/pages',{method:'PATCH',json:{pages}}); closeModal(); toast('Page access updated','good'); renderUsers(); }
+    catch(e){ btn.disabled=false; btn.textContent='Save access'; document.getElementById('pg_err').textContent=e.message; }
+  };
+}
+
+function openUserReset(u){
+  if(!u) return;
+  showModal(`<h3>Reset password — ${esc(u.name||u.code)}</h3><p class="msub">Set a new password, then share it with the user securely.</p>
+    <label class="field"><span>New password</span><input class="input" id="rp_pass" placeholder="At least 6 characters"/></label>
+    <div class="err" id="rp_err"></div>
+    <div class="modal-actions"><button class="btn ghost" id="mc">Cancel</button><button class="btn" id="mok">Reset password</button></div>`);
+  document.getElementById('mc').onclick = closeModal;
+  document.getElementById('mok').onclick = async ()=>{
+    const password=document.getElementById('rp_pass').value;
+    if(password.length<6){ document.getElementById('rp_err').textContent='At least 6 characters.'; return; }
+    const btn=document.getElementById('mok'); btn.disabled=true; btn.textContent='Resetting…';
+    try{ await api('/api/fm/users/'+u.id+'/reset-password',{method:'POST',json:{password}}); closeModal(); toast('Password reset','good'); }
+    catch(e){ btn.disabled=false; btn.textContent='Reset password'; document.getElementById('rp_err').textContent=e.message; }
+  };
+}
+
+async function userToggleActive(u){
+  if(!u) return;
+  const to = u.is_active===false;
+  if(!confirm((to?'Activate':'Deactivate')+' '+(u.name||u.code)+'?')) return;
+  try{ await api('/api/fm/users/'+u.id,{method:'PATCH',json:{is_active:to}}); toast(to?'Activated':'Deactivated','good'); renderUsers(); }
+  catch(e){ toast(e.message,'bad'); }
+}
+async function userDelete(u){
+  if(!u) return;
+  if(!confirm('Delete '+(u.name||u.code)+' permanently? This removes their login and cannot be undone.')) return;
+  try{ await api('/api/fm/users/'+u.id,{method:'DELETE'}); toast('User deleted','good'); renderUsers(); }
+  catch(e){ toast(e.message,'bad'); }
+}
+
 // ---------- ROUTER ----------
 function route(){
   try { if(state.page) localStorage.setItem('fm_page', state.page); } catch(e){}
@@ -1956,6 +2114,7 @@ function route(){
     case 'reports': renderReports(); break;
     case 'email': renderEmail(); break;
     case 'wafire': renderWaFire(); break;
+    case 'users': isSuperAdmin()?renderUsers():renderDashboard(); break;
     default: renderLists();
   }
 }
@@ -1977,6 +2136,12 @@ async function boot(){
     const { data: prof } = await sb.from('users').select('*').eq('id', state.user.id).single();
     state.profile = prof || { email: state.user.email, role: 'user', name: '' };
   } catch { state.profile = { email: state.user.email, role: 'user', name: '' }; }
+  // Load the platform profile + effective page/feature access (for nav gating + user mgmt)
+  try {
+    const me = await api('/api/fm/auth/me');
+    state.fmProfile = me.profile || null;
+    state.features = me.features || {};
+  } catch { state.fmProfile = null; state.features = {}; }
   // Returning from a Google OAuth flow (email or drive)?
   const h = location.hash || '';
   const addr = () => { const m = h.match(/addr=([^&]+)/); return m ? ': ' + decodeURIComponent(m[1]) : ''; };
@@ -1996,7 +2161,7 @@ async function boot(){
   }
   // Restore the last page the user was on (so a refresh stays put) — #3
   let saved=''; try { saved = localStorage.getItem('fm_page')||''; } catch(e){}
-  const valid = ['dashboard','lists','instruction','campaigns','reports','email','wafire'];
+  const valid = ['dashboard','lists','instruction','campaigns','reports','email','wafire','users'];
   state.page = valid.includes(saved) ? saved : 'dashboard';
   route();
 }
