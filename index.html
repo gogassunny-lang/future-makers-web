@@ -1562,8 +1562,13 @@ async function waUploadToDrive(file){
   } catch(e){ setMsg(''); toast('Upload failed: '+e.message,'bad'); }
 }
 
-function waOpenWhatsapp(q){
+async function waOpenWhatsapp(q){
   if(!q) return;
+  // Make sure any Drive media is publicly viewable BEFORE we send the link,
+  // so recipients open it instantly instead of hitting "Request access".
+  if(q.media_drive_id){
+    try{ const tok=(await api('/api/fm/drive/token')).access_token; await driveMakePublic(q.media_drive_id, tok); }catch(e){}
+  }
   // On desktop WhatsApp can't attach a file, so if there's media we include the
   // Drive link in the message — the recipient taps it to view/download.
   let msg = q.caption || '';
