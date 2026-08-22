@@ -1457,10 +1457,15 @@ async function waFireInApp(q){
       const blob = await r.blob();
       file = new File([blob], q.media_name||'media', { type: q.media_mime || blob.type || 'application/octet-stream' });
     }
-    const data = { text: q.caption || '' };
-    if(file && navigator.canShare && navigator.canShare({ files:[file] })) data.files = [file];
-    if(navigator.share){ await navigator.share(data); }
-    else { waOpenWhatsapp(q); }   // desktop fallback
+    // Only use the native share sheet when a FILE can actually be attached
+    // (mobile browsers). On desktop navigator.share opens the clunky Windows
+    // share sheet with no contact — so there we open the chat directly instead.
+    const canShareFile = !!(file && navigator.canShare && navigator.canShare({ files:[file] }));
+    if(canShareFile && navigator.share){
+      await navigator.share({ text: q.caption || '', files:[file] });
+    } else {
+      waOpenWhatsapp(q);   // desktop (and mobile without file-share): open the contact directly
+    }
   } catch(e){
     if(e && e.name === 'AbortError') return;  // user closed the share sheet
     toast('Share failed: '+e.message,'bad');
@@ -1500,11 +1505,15 @@ async function waUploadToDrive(file){
 
 function waOpenWhatsapp(q){
   if(!q) return;
-  const text = q.caption ? encodeURIComponent(q.caption) : '';
+  // On desktop WhatsApp can't attach a file, so if there's media we include the
+  // Drive link in the message — the recipient taps it to view/download.
+  let msg = q.caption || '';
+  if(q.media_url){ msg = (msg ? msg + '\n\n' : '') + '📎 ' + q.media_url; }
+  const text = msg ? encodeURIComponent(msg) : '';
   if(q.target_type==='person' && q.target_number){
     const digits = q.target_number.replace(/\D/g,'');
     window.open('https://wa.me/'+digits+(text?('?text='+text):''), '_blank');
-    if(q.media_url) toast('WhatsApp opened. Attach the media (Open link), then Send — then Mark sent.','good');
+    toast('WhatsApp opened to '+(q.target_name||'the contact')+'. Review and Send, then tap “Mark sent”.','good');
   } else {
     // group: WhatsApp has no by-name deep link — copy caption + open WhatsApp Web
     if(navigator.clipboard && q.caption) navigator.clipboard.writeText(q.caption).catch(()=>{});
