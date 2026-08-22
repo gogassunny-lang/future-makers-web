@@ -1433,12 +1433,15 @@ async function waFireInApp(q){
   // Path A: our custom native app
   if(inFireApp()){
     try {
+      // For a person target, pass the number so WhatsApp opens that chat directly
+      // with a caption preview. For a group (no number) leave it blank.
+      const num = (q.target_type === 'person' && q.target_number) ? String(q.target_number) : '';
       if(q.media_drive_id){
         toast('Preparing file…','good');
         const tok = (await api('/api/fm/drive/token')).access_token;
-        window.AndroidFire.shareDriveFile(tok, q.media_drive_id, q.media_mime||'application/octet-stream', q.media_name||'media', q.caption||'');
+        window.AndroidFire.shareDriveFile(tok, q.media_drive_id, q.media_mime||'application/octet-stream', q.media_name||'media', q.caption||'', num);
       } else {
-        window.AndroidFire.shareText(q.caption||'');
+        window.AndroidFire.shareText(q.caption||'', num);
       }
     } catch(e){ toast('Fire failed: '+e.message,'bad'); }
     return;
