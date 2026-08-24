@@ -1429,7 +1429,7 @@ async function renderWaFire(){
         <table><thead><tr><th>Campaign</th><th>Send to</th><th>Caption</th><th>Media</th><th></th></tr></thead><tbody>
         ${queue.map(q=>`<tr>
           <td><b>${esc(q.title)}</b></td>
-          <td>${q.target_type==='person'?'👤':'👥'} ${esc(q.target_name)}${q.target_number?` <span style="color:var(--ink-soft)">(${esc(q.target_number)})</span>`:''}</td>
+          <td>${q.target_type==='person'?'👤':q.target_type==='list'?'📢':'👥'} ${esc(q.target_name)}${q.target_number?` <span style="color:var(--ink-soft)">(${esc(q.target_number)})</span>`:''}</td>
           <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(q.caption||'—')}</td>
           <td>${q.media_url?`<a href="${esc(q.media_url)}" target="_blank" rel="noopener">open</a>`:'—'}</td>
           <td><div class="row-actions">
@@ -1444,7 +1444,7 @@ async function renderWaFire(){
       ${campaigns.map(c=>`<tr>
         <td><input type="checkbox" class="wachk" value="${c.id}"/></td>
         <td><b>${esc(c.title)}</b>${c.caption?`<div style="font-size:12px;color:var(--ink-soft);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.caption)}</div>`:''}</td>
-        <td>${c.target_type==='person'?'👤':'👥'} ${esc(c.target_name)}</td>
+        <td>${c.target_type==='person'?'👤':c.target_type==='list'?'📢':'👥'} ${esc(c.target_name)}</td>
         <td class="phone-cell">${waRepeatLabel(c)}</td>
         <td>${waPill(c.status)}</td>
         <td class="phone-cell">${c.next_run_at?'Next '+waDate(c.next_run_at):(c.last_fired_at?'Last '+waDate(c.last_fired_at):'—')}</td>
@@ -1606,15 +1606,20 @@ async function waOpenWhatsapp(q){
 }
 function waGroupHelper(q, msg){
   msg = msg || q.caption || '';
-  showModal(`<h3>Send to group</h3><p class="msub">WhatsApp has no group link, so you pick the group — this makes it two quick pastes.</p>
-    <label class="field"><span>Step 1 · Group name — paste into WhatsApp's search</span><input class="input" id="gh_name" readonly value="${esc(q.target_name||'')}"/></label>
-    <button class="btn sm" id="gh_cn" style="margin:-4px 0 12px">📋 Copy group name</button>
-    <label class="field"><span>Step 2 · Message — paste inside the group, then send</span><textarea class="input" id="gh_msg" rows="4" readonly style="resize:vertical">${esc(msg)}</textarea></label>
+  const isList = q.target_type==='list';
+  const kind = isList ? 'Broadcast List' : 'group';
+  const intro = isList
+    ? 'Broadcast Lists live only on your phone (WhatsApp Web has none). On desktop you can copy the message below — but to actually send, open <b>FM Fire on your phone</b>, fire this, and pick your Broadcast List in WhatsApp\'s share screen.'
+    : 'WhatsApp has no group link, so you pick the '+kind+' — this makes it two quick pastes.';
+  showModal(`<h3>Send to ${kind}</h3><p class="msub">${intro}</p>
+    <label class="field"><span>Step 1 · ${kind} name — ${isList?'find it on your phone':'paste into WhatsApp\'s search'}</span><input class="input" id="gh_name" readonly value="${esc(q.target_name||'')}"/></label>
+    <button class="btn sm" id="gh_cn" style="margin:-4px 0 12px">📋 Copy name</button>
+    <label class="field"><span>Step 2 · Message — paste inside the ${kind}, then send</span><textarea class="input" id="gh_msg" rows="4" readonly style="resize:vertical">${esc(msg)}</textarea></label>
     <button class="btn sm" id="gh_cm" style="margin:-4px 0 4px">📋 Copy message</button>
     <div class="modal-actions"><button class="btn ghost" id="mc">Close</button><button class="btn" id="mok">Open WhatsApp →</button></div>`);
   document.getElementById('mc').onclick = closeModal;
-  document.getElementById('gh_cn').onclick = ()=>{ (navigator.clipboard?navigator.clipboard.writeText(q.target_name||''):Promise.reject()).then(()=>toast('Group name copied — paste in WhatsApp search','good')).catch(()=>{ const el=document.getElementById('gh_name'); el.select(); document.execCommand('copy'); toast('Group name copied','good'); }); };
-  document.getElementById('gh_cm').onclick = ()=>{ (navigator.clipboard?navigator.clipboard.writeText(msg):Promise.reject()).then(()=>toast('Message copied — paste in the group','good')).catch(()=>{ const el=document.getElementById('gh_msg'); el.select(); document.execCommand('copy'); toast('Message copied','good'); }); };
+  document.getElementById('gh_cn').onclick = ()=>{ (navigator.clipboard?navigator.clipboard.writeText(q.target_name||''):Promise.reject()).then(()=>toast('Name copied','good')).catch(()=>{ const el=document.getElementById('gh_name'); el.select(); document.execCommand('copy'); toast('Name copied','good'); }); };
+  document.getElementById('gh_cm').onclick = ()=>{ (navigator.clipboard?navigator.clipboard.writeText(msg):Promise.reject()).then(()=>toast('Message copied','good')).catch(()=>{ const el=document.getElementById('gh_msg'); el.select(); document.execCommand('copy'); toast('Message copied','good'); }); };
   document.getElementById('mok').onclick = ()=>{ try{ window.location.href='whatsapp://'; }catch(e){ window.open('https://web.whatsapp.com/','_blank'); } };
 }
 async function waFired(id){
