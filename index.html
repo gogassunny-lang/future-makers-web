@@ -1732,7 +1732,7 @@ async function waAction(id, act){
 function openWaModal(){
   showModal(`<h3>New WhatsApp campaign</h3><p class="msub">Schedules a campaign. When it's due you tap send on your phone.</p>
     <label class="field"><span>Campaign title (internal)</span><input class="input" id="wa_title" placeholder="Morning safety instruction"/></label>
-    <label class="field"><span>Send to</span><select class="input" id="wa_ttype" onchange="waTargetChange()"><option value="group">A WhatsApp group</option><option value="person">A person</option></select></label>
+    <label class="field"><span>Send to</span><select class="input" id="wa_ttype" onchange="waTargetChange()"><option value="person">A person</option><option value="list">A broadcast list (each person individually)</option><option value="group">A WhatsApp group</option></select></label>
     <div id="wa_target"></div>
     <label class="field"><span>Video / file — optional (leave blank for a text-only message)</span>
       <div class="row" style="gap:8px;align-items:stretch">
@@ -1813,6 +1813,16 @@ function waTargetChange(){
       <div style="margin:-4px 0 4px 2px"><a href="#" id="wa_contacts_link" style="font-size:12px;color:var(--accent,#D65A1E)">📇 Manage / import WhatsApp contacts</a></div>`;
     const nm = document.getElementById('wa_tname'); if(nm) nm.oninput = waContactSearch;
     const lk = document.getElementById('wa_contacts_link'); if(lk) lk.onclick = e=>{ e.preventDefault(); openWaContactsModal(); };
+  } else if(t==='list'){
+    box.innerHTML = `<label class="field"><span>Broadcast list</span>
+        <select class="input" id="wa_list"><option value="">Loading lists…</option></select>
+        <div style="font-size:12px;color:var(--ink-soft);margin-top:6px">📣 Fires each person on the list <b>individually</b> — their chat opens with the attachment + message, you tap send, then the next. Real personal sends, no group needed.</div></label>`;
+    api('/api/lists').then(({lists})=>{
+      const sel=document.getElementById('wa_list'); if(!sel) return;
+      sel.innerHTML = (lists && lists.length)
+        ? lists.map(l=>`<option value="${l.id}">${esc(l.name)}${l.contact_count!=null?' ('+l.contact_count+')':(l.count!=null?' ('+l.count+')':'')}</option>`).join('')
+        : `<option value="">No lists yet — create one in Broadcast Lists</option>`;
+    }).catch(()=>{ const sel=document.getElementById('wa_list'); if(sel) sel.innerHTML=`<option value="">Couldn't load lists</option>`; });
   } else {
     box.innerHTML = `<label class="field"><span>Exact WhatsApp group name</span><input class="input" id="wa_tname" placeholder="GOGAS Field Team"/></label>`;
   }
@@ -1862,15 +1872,21 @@ function waRepeatChange(){
   } else if(rt==='monthly'){ e.innerHTML = `<label class="field"><span>Day of month (1–28)</span><input class="input" id="wa_dom" type="number" min="1" max="28" value="1"/></label>`; }
   else e.innerHTML='';
 }
+function waNormNum(raw){
+  const digits = String(raw||'').replace(/\D/g,'');
+  if(digits.length===10) return '+91'+digits;
+  if(digits.length===12 && digits.startsWith('91')) return '+'+digits;
+  if(digits.length===11 && digits.startsWith('0')) return '+91'+digits.slice(1);
+  if(digits.length>=10) return '+'+digits;
+  return null;
+}
 async function waCreate(){
   const errEl = document.getElementById('wa_err');
   const title = document.getElementById('wa_title').value.trim();
   const target_type = document.getElementById('wa_ttype').value;
-  const target_name = document.getElementById('wa_tname') ? document.getElementById('wa_tname').value.trim() : '';
   if(!title){ errEl.textContent='Campaign title is required.'; return; }
-  if(!target_name){ errEl.textContent='Enter the target group or person.'; return; }
   const payload = {
-    title, target_type, target_name,
+    title, target_type,
     media_url: document.getElementById('wa_media').value.trim(),
     media_drive_id: state.waPicked ? state.waPicked.id : null,
     media_name: state.waPicked ? state.waPicked.name : null,
@@ -1880,16 +1896,7 @@ async function waCreate(){
     mode: document.getElementById('wa_mode').value,
   };
   if(!payload.media_url && !payload.caption){ errEl.textContent='Add a message, a media link, or both.'; return; }
-  if(target_type==='person'){
-    const raw = document.getElementById('wa_tnum') ? document.getElementById('wa_tnum').value.trim() : '';
-    const digits = raw.replace(/\D/g,'');
-    let e164;
-    if(digits.length===10) e164='+91'+digits;
-    else if(digits.length===12 && digits.startsWith('91')) e164='+'+digits;
-    else if(digits.length===11 && digits.startsWith('0')) e164='+91'+digits.slice(1);
-    else { errEl.textContent='Enter a valid 10-digit Indian mobile number.'; return; }
-    payload.target_number = e164;
-  }
+  // schedule fields (shared by all target types)
   if(payload.mode==='once'){ const w=document.getElementById('wa_when').value; if(!w){ errEl.textContent='Pick a date & time.'; return; } payload.run_at=new Date(w).toISOString(); }
   else if(payload.mode==='recurring'){
     payload.repeat_type=document.getElementById('wa_rt').value;
@@ -1899,6 +1906,36 @@ async function waCreate(){
     if(payload.repeat_type==='monthly'){ payload.repeat_dom=+document.getElementById('wa_dom').value||1; }
   }
   const btn=document.getElementById('mok'); btn.disabled=true; btn.textContent='Scheduling…';
+
+  // ---- Broadcast list: one INDIVIDUAL campaign per member (each auto-opens with media) ----
+  if(target_type==='list'){
+    const listId = document.getElementById('wa_list') ? document.getElementById('wa_list').value : '';
+    if(!listId){ errEl.textContent='Pick a broadcast list.'; btn.disabled=false; btn.textContent='Schedule'; return; }
+    try{
+      const { list, contacts } = await api('/api/lists/'+listId);
+      const members = (contacts||[]).map(c=>({ name:c.name, number:waNormNum(c.phone) })).filter(m=>m.number);
+      if(!members.length){ errEl.textContent='That list has no contacts with valid phone numbers.'; btn.disabled=false; btn.textContent='Schedule'; return; }
+      const listName = (list && list.name) || 'list';
+      let ok=0;
+      for(const m of members){
+        try{ await api('/api/fm/wa',{method:'POST',json:{ ...payload, target_type:'person', target_name:(m.name||m.number), target_number:m.number, title:title+' • '+listName }}); ok++; }catch(e){}
+      }
+      closeModal();
+      toast('Scheduled '+ok+' individual send'+(ok===1?'':'s')+' from “'+listName+'”. Fire each in the queue.','good');
+      renderWaFire();
+    }catch(e){ btn.disabled=false; btn.textContent='Schedule'; errEl.textContent=e.message; }
+    return;
+  }
+
+  // ---- Person / Group ----
+  const target_name = document.getElementById('wa_tname') ? document.getElementById('wa_tname').value.trim() : '';
+  if(!target_name){ errEl.textContent='Enter the target group or person.'; btn.disabled=false; btn.textContent='Schedule'; return; }
+  payload.target_name = target_name;
+  if(target_type==='person'){
+    const e164 = waNormNum(document.getElementById('wa_tnum') ? document.getElementById('wa_tnum').value : '');
+    if(!e164){ errEl.textContent='Enter a valid 10-digit Indian mobile number.'; btn.disabled=false; btn.textContent='Schedule'; return; }
+    payload.target_number = e164;
+  }
   try { await api('/api/fm/wa',{method:'POST',json:payload}); closeModal(); toast('Campaign scheduled','good'); renderWaFire(); }
   catch(e){ btn.disabled=false; btn.textContent='Schedule'; errEl.textContent=e.message; }
 }
