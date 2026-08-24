@@ -1589,11 +1589,22 @@ async function waOpenWhatsapp(q){
     state.lastWaWeb = 'https://wa.me/'+digits+(text?('?text='+text):'');
     toast('Opening WhatsApp Desktop to '+(q.target_name||'the contact')+'. If nothing opens, tap the 📲 button again. Review & Send, then “Mark sent”.','good');
   } else {
-    // group: WhatsApp has NO by-name deep link — copy the full message + open WhatsApp to search
-    if(navigator.clipboard && msg) navigator.clipboard.writeText(msg).catch(()=>{});
-    toast('Group “'+(q.target_name||'')+'”: message copied 📋. In WhatsApp search this group, open it, paste (Ctrl+V) & send.','good');
-    try { window.location.href = 'whatsapp://'; } catch(e){ window.open('https://web.whatsapp.com/', '_blank'); }
+    // group: WhatsApp has NO by-name deep link — show a guided copy/paste helper
+    waGroupHelper(q, msg);
   }
+}
+function waGroupHelper(q, msg){
+  msg = msg || q.caption || '';
+  showModal(`<h3>Send to group</h3><p class="msub">WhatsApp has no group link, so you pick the group — this makes it two quick pastes.</p>
+    <label class="field"><span>Step 1 · Group name — paste into WhatsApp's search</span><input class="input" id="gh_name" readonly value="${esc(q.target_name||'')}"/></label>
+    <button class="btn sm" id="gh_cn" style="margin:-4px 0 12px">📋 Copy group name</button>
+    <label class="field"><span>Step 2 · Message — paste inside the group, then send</span><textarea class="input" id="gh_msg" rows="4" readonly style="resize:vertical">${esc(msg)}</textarea></label>
+    <button class="btn sm" id="gh_cm" style="margin:-4px 0 4px">📋 Copy message</button>
+    <div class="modal-actions"><button class="btn ghost" id="mc">Close</button><button class="btn" id="mok">Open WhatsApp →</button></div>`);
+  document.getElementById('mc').onclick = closeModal;
+  document.getElementById('gh_cn').onclick = ()=>{ (navigator.clipboard?navigator.clipboard.writeText(q.target_name||''):Promise.reject()).then(()=>toast('Group name copied — paste in WhatsApp search','good')).catch(()=>{ const el=document.getElementById('gh_name'); el.select(); document.execCommand('copy'); toast('Group name copied','good'); }); };
+  document.getElementById('gh_cm').onclick = ()=>{ (navigator.clipboard?navigator.clipboard.writeText(msg):Promise.reject()).then(()=>toast('Message copied — paste in the group','good')).catch(()=>{ const el=document.getElementById('gh_msg'); el.select(); document.execCommand('copy'); toast('Message copied','good'); }); };
+  document.getElementById('mok').onclick = ()=>{ try{ window.location.href='whatsapp://'; }catch(e){ window.open('https://web.whatsapp.com/','_blank'); } };
 }
 async function waFired(id){
   if(!confirm('Mark this campaign as sent? Do this after you have tapped send in WhatsApp.')) return;
