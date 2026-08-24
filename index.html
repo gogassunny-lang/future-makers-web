@@ -1814,15 +1814,9 @@ function waTargetChange(){
     const nm = document.getElementById('wa_tname'); if(nm) nm.oninput = waContactSearch;
     const lk = document.getElementById('wa_contacts_link'); if(lk) lk.onclick = e=>{ e.preventDefault(); openWaContactsModal(); };
   } else if(t==='list'){
-    box.innerHTML = `<label class="field"><span>Broadcast list</span>
-        <select class="input" id="wa_list"><option value="">Loading lists…</option></select>
-        <div style="font-size:12px;color:var(--ink-soft);margin-top:6px">📣 Fires each person on the list <b>individually</b> — their chat opens with the attachment + message, you tap send, then the next. Real personal sends, no group needed.</div></label>`;
-    api('/api/lists').then(({lists})=>{
-      const sel=document.getElementById('wa_list'); if(!sel) return;
-      sel.innerHTML = (lists && lists.length)
-        ? lists.map(l=>`<option value="${l.id}">${esc(l.name)}${l.contact_count!=null?' ('+l.contact_count+')':(l.count!=null?' ('+l.count+')':'')}</option>`).join('')
-        : `<option value="">No lists yet — create one in Broadcast Lists</option>`;
-    }).catch(()=>{ const sel=document.getElementById('wa_list'); if(sel) sel.innerHTML=`<option value="">Couldn't load lists</option>`; });
+    box.innerHTML = `<label class="field"><span>WhatsApp Broadcast List name</span>
+        <input class="input" id="wa_tname" placeholder="e.g. GOGAS Broadcast"/>
+        <div style="font-size:12px;color:var(--ink-soft);margin-top:6px">📢 On your <b>phone</b>: tap Fire → WhatsApp's share screen opens with the media + message → pick your <b>Broadcast List</b> there → it delivers to every member individually, with the attachment. Create the Broadcast List inside WhatsApp first (it's a phone-only WhatsApp feature — not available on WhatsApp Web).</div></label>`;
   } else {
     box.innerHTML = `<label class="field"><span>Exact WhatsApp group name</span><input class="input" id="wa_tname" placeholder="GOGAS Field Team"/></label>`;
   }
@@ -1907,29 +1901,9 @@ async function waCreate(){
   }
   const btn=document.getElementById('mok'); btn.disabled=true; btn.textContent='Scheduling…';
 
-  // ---- Broadcast list: one INDIVIDUAL campaign per member (each auto-opens with media) ----
-  if(target_type==='list'){
-    const listId = document.getElementById('wa_list') ? document.getElementById('wa_list').value : '';
-    if(!listId){ errEl.textContent='Pick a broadcast list.'; btn.disabled=false; btn.textContent='Schedule'; return; }
-    try{
-      const { list, contacts } = await api('/api/lists/'+listId);
-      const members = (contacts||[]).map(c=>({ name:c.name, number:waNormNum(c.phone) })).filter(m=>m.number);
-      if(!members.length){ errEl.textContent='That list has no contacts with valid phone numbers.'; btn.disabled=false; btn.textContent='Schedule'; return; }
-      const listName = (list && list.name) || 'list';
-      let ok=0;
-      for(const m of members){
-        try{ await api('/api/fm/wa',{method:'POST',json:{ ...payload, target_type:'person', target_name:(m.name||m.number), target_number:m.number, title:title+' • '+listName }}); ok++; }catch(e){}
-      }
-      closeModal();
-      toast('Scheduled '+ok+' individual send'+(ok===1?'':'s')+' from “'+listName+'”. Fire each in the queue.','good');
-      renderWaFire();
-    }catch(e){ btn.disabled=false; btn.textContent='Schedule'; errEl.textContent=e.message; }
-    return;
-  }
-
-  // ---- Person / Group ----
+  // ---- Person / Group / Broadcast list (list & group both fire to WhatsApp's share picker) ----
   const target_name = document.getElementById('wa_tname') ? document.getElementById('wa_tname').value.trim() : '';
-  if(!target_name){ errEl.textContent='Enter the target group or person.'; btn.disabled=false; btn.textContent='Schedule'; return; }
+  if(!target_name){ errEl.textContent = target_type==='list' ? 'Enter your WhatsApp Broadcast List name.' : 'Enter the target group or person.'; btn.disabled=false; btn.textContent='Schedule'; return; }
   payload.target_name = target_name;
   if(target_type==='person'){
     const e164 = waNormNum(document.getElementById('wa_tnum') ? document.getElementById('wa_tnum').value : '');
