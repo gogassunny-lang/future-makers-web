@@ -1589,9 +1589,9 @@ async function waOpenWhatsapp(q){
     state.lastWaWeb = 'https://wa.me/'+digits+(text?('?text='+text):'');
     toast('Opening WhatsApp Desktop to '+(q.target_name||'the contact')+'. If nothing opens, tap the 📲 button again. Review & Send, then “Mark sent”.','good');
   } else {
-    // group: WhatsApp has no by-name deep link — copy caption + open WhatsApp
-    if(navigator.clipboard && q.caption) navigator.clipboard.writeText(q.caption).catch(()=>{});
-    toast('Caption copied. Open WhatsApp, search the group "'+(q.target_name||'')+'", paste & send.','good');
+    // group: WhatsApp has NO by-name deep link — copy the full message + open WhatsApp to search
+    if(navigator.clipboard && msg) navigator.clipboard.writeText(msg).catch(()=>{});
+    toast('Group “'+(q.target_name||'')+'”: message copied 📋. In WhatsApp search this group, open it, paste (Ctrl+V) & send.','good');
     try { window.location.href = 'whatsapp://'; } catch(e){ window.open('https://web.whatsapp.com/', '_blank'); }
   }
 }
