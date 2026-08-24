@@ -1176,6 +1176,10 @@ async function openEmailModal(){
   const input = document.getElementById('em_input');
   input.oninput = emOnType;
   input.onkeydown = emOnKey;
+  input.onpaste = e => {
+    const txt = (e.clipboardData || window.clipboardData).getData('text');
+    if(txt && /[,;\s]/.test(txt.trim())){ e.preventDefault(); emAddMany(txt); input.value=''; const dd=document.getElementById('em_dd'); if(dd){ dd.style.display='none'; dd.innerHTML=''; } }
+  };
   const ls = document.getElementById('em_list');
   if (ls) ls.onchange = () => emPickList(ls);
   emRenderChips();
@@ -1190,12 +1194,19 @@ function emRenderChips(){
   box.querySelectorAll('[data-emrm]').forEach(b=> b.onclick=()=>{ state.emRcpts.splice(+b.dataset.emrm,1); emRenderChips(); });
 }
 function emAddRecipient(r){
-  if(!r || !r.email || !r.email.includes('@')) return;
-  const em = r.email.trim().toLowerCase();
+  if(!r || !r.email) return;
+  const email = String(r.email).trim();
+  // one value holding several addresses (pasted list) -> add each separately
+  if(/[,;\s]/.test(email)){ emAddMany(email); return; }
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ toast('Skipped invalid email: '+email,'bad'); return; }
+  const em = email.toLowerCase();
   state.emRcpts = state.emRcpts || [];
   if(state.emRcpts.some(x=>x.email.toLowerCase()===em)) return;
-  state.emRcpts.push({ name: r.name || null, email: r.email.trim() });
+  state.emRcpts.push({ name: r.name || null, email });
   emRenderChips();
+}
+function emAddMany(text){
+  String(text||'').split(/[,;\s]+/).map(s=>s.trim()).filter(Boolean).forEach(e=> emAddRecipient({ email:e }));
 }
 let emSearchTimer = null;
 function emOnType(e){
