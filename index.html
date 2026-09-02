@@ -2008,10 +2008,11 @@ const ROLE_LABEL = { super_admin:'Super Admin', admin:'Admin', broadcaster:'Broa
 async function renderUsers(){
   renderShell(`<div class="page-head">
     <div><div class="eyebrow">Administration</div><h2>User Management</h2><p>Create users, control which pages each one sees, reset passwords, and manage access.</p></div>
-    <div class="row" style="gap:8px"><button class="btn ghost" id="usrRefresh">↻ Refresh</button><button class="btn" id="usrNew">+ New user</button></div>
+    <div class="row" style="gap:8px"><button class="btn ghost" id="usrUsage">📊 Usage</button><button class="btn ghost" id="usrRefresh">↻ Refresh</button><button class="btn" id="usrNew">+ New user</button></div>
   </div><div id="usrArea"><div class="loading">Loading users…</div></div>`);
   document.getElementById('usrNew').onclick = ()=>openUserModal();
   document.getElementById('usrRefresh').onclick = ()=>renderUsers();
+  document.getElementById('usrUsage').onclick = ()=>renderUsage();
   const area = document.getElementById('usrArea');
   try{
     const { users } = await api('/api/fm/users');
@@ -2020,7 +2021,7 @@ async function renderUsers(){
     area.innerHTML = `<div class="panel" style="overflow-x:auto"><table><thead><tr><th>Name</th><th>Login</th><th>Role</th><th>Pages</th><th>Status</th><th></th></tr></thead><tbody>
       ${users.map(u=>{
         const pages = FM_PAGES.filter(([k])=> (u.features||{})[k] !== false).length;
-        const me = state.fmProfile && u.id===state.fmProfile.id;
+        const me = (state.fmProfile && u.id===state.fmProfile.id) || String(u.code||'').toLowerCase()==='sg001';
         return `<tr>
           <td><b>${esc(u.name||'—')}</b></td>
           <td>${esc(u.email||(u.code+'@fm.internal'))}<div style="font-size:12px;color:var(--ink-soft)">code: ${esc(u.code)}</div></td>
@@ -2044,6 +2045,35 @@ async function renderUsers(){
     area.querySelectorAll('[data-utog]').forEach(b=> b.onclick=()=>userToggleActive(find(b.dataset.utog)));
     area.querySelectorAll('[data-udel]').forEach(b=> b.onclick=()=>userDelete(find(b.dataset.udel)));
   }catch(e){ area.innerHTML = `<div class="empty"><h3>Couldn't load</h3><p>${esc(e.message)}</p></div>`; }
+}
+
+function usgDate(s){ try{ return new Date(s).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); }catch(e){ return s; } }
+async function renderUsage(){
+  renderShell(`<div class="page-head">
+    <div><div class="eyebrow">Administration</div><h2>Usage &amp; Activity</h2><p>Per-user activity from the audit log — last login and actions over time.</p></div>
+    <div class="row" style="gap:8px"><button class="btn ghost" id="usgBack">← Users</button><button class="btn ghost" id="usgRefresh">↻ Refresh</button></div>
+  </div>
+  <div id="usgCards" class="rep-grid" style="margin-bottom:16px"></div>
+  <div id="usgArea"><div class="loading">Loading usage…</div></div>`);
+  document.getElementById('usgBack').onclick = ()=>renderUsers();
+  document.getElementById('usgRefresh').onclick = ()=>renderUsage();
+  try{
+    const { usage, summary } = await api('/api/fm/users/usage');
+    const card=(v,l)=>`<div class="rep-card"><h3 style="font-size:26px;margin:0">${v}</h3><div class="rl">${l}</div></div>`;
+    document.getElementById('usgCards').innerHTML =
+      card(summary.users,'Users') + card(summary.active_today,'Active today') +
+      card(summary.actions_today,'Actions today') + card(summary.actions_month,'Actions (30d)');
+    const area = document.getElementById('usgArea');
+    area.innerHTML = usage.length ? `<div class="panel" style="overflow-x:auto"><table><thead><tr><th>User</th><th>Role</th><th>Last login</th><th>Last active</th><th>Today</th><th>7 days</th><th>30 days</th></tr></thead><tbody>
+      ${usage.map(u=>`<tr>
+        <td><b>${esc(u.name||u.code)}</b><div style="font-size:12px;color:var(--ink-soft)">${esc(u.email||u.code)}</div></td>
+        <td>${esc(ROLE_LABEL[u.role]||u.role)}${u.active?'':' <span style="color:var(--stop)">· inactive</span>'}</td>
+        <td class="phone-cell">${u.last_login?usgDate(u.last_login):'—'}</td>
+        <td class="phone-cell">${u.last_active?usgDate(u.last_active):'—'}</td>
+        <td><b>${u.today}</b></td><td>${u.week}</td><td>${u.month}</td>
+      </tr>`).join('')}
+    </tbody></table></div>` : `<div class="empty"><h3>No activity yet</h3><p>Activity appears here as users log in and work.</p></div>`;
+  }catch(e){ document.getElementById('usgArea').innerHTML=`<div class="empty"><h3>Couldn't load</h3><p>${esc(e.message)}</p></div>`; }
 }
 
 function openUserModal(){
