@@ -1077,7 +1077,7 @@ function renderEmailList(st, cs){
       <div class="panel"><table><thead><tr><th style="width:34px"><input type="checkbox" id="emAll" title="Select all"/></th><th>Subject</th><th>Schedule</th><th>Recipients</th><th>Status</th><th>Next / last</th><th></th></tr></thead><tbody>
       ${cs.map(c=>`<tr>
         <td><input type="checkbox" class="emchk" value="${c.id}"/></td>
-        <td><b>${esc(c.subject)}</b></td>
+        <td><b>${esc(c.subject)}</b>${c.owner_name?`<div style="font-size:11px;color:var(--ink-soft)">by ${esc(c.owner_name)}</div>`:''}</td>
         <td class="phone-cell">${repeat(c)}</td>
         <td>${c.recipient_count}</td>
         <td>${pill(c.status)}</td>
@@ -1428,7 +1428,7 @@ async function renderWaFire(){
         <div style="padding:12px 16px;font-weight:800;color:#a0561e">🔥 Due to fire now (${queue.length})</div>
         <table><thead><tr><th>Campaign</th><th>Send to</th><th>Caption</th><th>Media</th><th></th></tr></thead><tbody>
         ${queue.map(q=>`<tr>
-          <td><b>${esc(q.title)}</b></td>
+          <td><b>${esc(q.title)}</b>${q.owner_name?`<div style="font-size:11px;color:var(--ink-soft)">by ${esc(q.owner_name)}</div>`:''}</td>
           <td>${q.target_type==='person'?'👤':q.target_type==='list'?'📢':'👥'} ${esc(q.target_name)}${q.target_number?` <span style="color:var(--ink-soft)">(${esc(q.target_number)})</span>`:''}</td>
           <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(q.caption||'—')}</td>
           <td>${q.media_url?`<a href="${esc(q.media_url)}" target="_blank" rel="noopener">open</a>`:'—'}</td>
@@ -1443,7 +1443,7 @@ async function renderWaFire(){
     html += campaigns.length ? `<div class="panel"><table><thead><tr><th style="width:34px"><input type="checkbox" id="waAll" title="Select all"/></th><th>Campaign</th><th>Target</th><th>Schedule</th><th>Status</th><th>Next / last</th><th></th></tr></thead><tbody>
       ${campaigns.map(c=>`<tr>
         <td><input type="checkbox" class="wachk" value="${c.id}"/></td>
-        <td><b>${esc(c.title)}</b>${c.caption?`<div style="font-size:12px;color:var(--ink-soft);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.caption)}</div>`:''}</td>
+        <td><b>${esc(c.title)}</b>${c.owner_name?`<div style="font-size:11px;color:var(--ink-soft)">by ${esc(c.owner_name)}</div>`:''}${c.caption?`<div style="font-size:12px;color:var(--ink-soft);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.caption)}</div>`:''}</td>
         <td>${c.target_type==='person'?'👤':c.target_type==='list'?'📢':'👥'} ${esc(c.target_name)}</td>
         <td class="phone-cell">${waRepeatLabel(c)}</td>
         <td>${waPill(c.status)}</td>
@@ -2048,9 +2048,10 @@ async function renderUsers(){
 }
 
 function usgDate(s){ try{ return new Date(s).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); }catch(e){ return s; } }
+function fmtDur(sec){ sec=Math.round(sec||0); if(sec<=0) return '—'; const h=Math.floor(sec/3600), m=Math.floor((sec%3600)/60), s=sec%60; if(h) return h+'h '+m+'m'; if(m) return m+'m '+s+'s'; return s+'s'; }
 async function renderUsage(){
   renderShell(`<div class="page-head">
-    <div><div class="eyebrow">Administration</div><h2>Usage &amp; Activity</h2><p>Per-user activity from the audit log — last login and actions over time.</p></div>
+    <div><div class="eyebrow">Administration</div><h2>Usage &amp; Activity</h2><p>Per-user time spent, last login and live sessions. Updates every minute while users are active.</p></div>
     <div class="row" style="gap:8px"><button class="btn ghost" id="usgBack">← Users</button><button class="btn ghost" id="usgRefresh">↻ Refresh</button></div>
   </div>
   <div id="usgCards" class="rep-grid" style="margin-bottom:16px"></div>
@@ -2061,19 +2062,31 @@ async function renderUsage(){
     const { usage, summary } = await api('/api/fm/users/usage');
     const card=(v,l)=>`<div class="rep-card"><h3 style="font-size:26px;margin:0">${v}</h3><div class="rl">${l}</div></div>`;
     document.getElementById('usgCards').innerHTML =
-      card(summary.users,'Users') + card(summary.active_today,'Active today') +
-      card(summary.actions_today,'Actions today') + card(summary.actions_month,'Actions (30d)');
+      card(summary.users,'Users') + card('🟢 '+summary.live,'Live now') +
+      card(summary.active_today,'Active today') + card(fmtDur(summary.time_today),'Time today (team)');
     const area = document.getElementById('usgArea');
-    area.innerHTML = usage.length ? `<div class="panel" style="overflow-x:auto"><table><thead><tr><th>User</th><th>Role</th><th>Last login</th><th>Last active</th><th>Today</th><th>7 days</th><th>30 days</th></tr></thead><tbody>
+    area.innerHTML = usage.length ? `<div class="panel" style="overflow-x:auto"><table><thead><tr><th>User</th><th>Role</th><th>Last login</th><th>Today</th><th>7 days</th><th>30 days</th><th>Live</th></tr></thead><tbody>
       ${usage.map(u=>`<tr>
         <td><b>${esc(u.name||u.code)}</b><div style="font-size:12px;color:var(--ink-soft)">${esc(u.email||u.code)}</div></td>
         <td>${esc(ROLE_LABEL[u.role]||u.role)}${u.active?'':' <span style="color:var(--stop)">· inactive</span>'}</td>
         <td class="phone-cell">${u.last_login?usgDate(u.last_login):'—'}</td>
-        <td class="phone-cell">${u.last_active?usgDate(u.last_active):'—'}</td>
-        <td><b>${u.today}</b></td><td>${u.week}</td><td>${u.month}</td>
+        <td><b>${fmtDur(u.sec_today)}</b></td>
+        <td>${fmtDur(u.sec_week)}</td>
+        <td>${fmtDur(u.sec_month)}</td>
+        <td>${u.live?'<span style="color:#16a34a;font-weight:700">● live</span>':'<span style="color:var(--ink-soft)">—</span>'}</td>
       </tr>`).join('')}
     </tbody></table></div>` : `<div class="empty"><h3>No activity yet</h3><p>Activity appears here as users log in and work.</p></div>`;
   }catch(e){ document.getElementById('usgArea').innerHTML=`<div class="empty"><h3>Couldn't load</h3><p>${esc(e.message)}</p></div>`; }
+}
+let _fmHeartbeat=null, _fmLastPing=Date.now();
+function startHeartbeat(){
+  if(_fmHeartbeat) return;
+  _fmLastPing = Date.now();
+  _fmHeartbeat = setInterval(()=>{
+    if(document.hidden){ _fmLastPing = Date.now(); return; }   // don't count time in background
+    const secs = Math.round((Date.now()-_fmLastPing)/1000); _fmLastPing = Date.now();
+    if(secs>0) api('/api/fm/auth/ping',{method:'POST',json:{ seconds: secs }}).catch(()=>{});
+  }, 60000);
 }
 
 function openUserModal(){
@@ -2227,6 +2240,11 @@ async function boot(){
     state.fmProfile = me.profile || null;
     state.features = me.features || {};
   } catch { state.fmProfile = null; state.features = {}; }
+  // record this login + start the activity heartbeat (powers Usage tracking)
+  if(state.fmProfile){
+    api('/api/fm/auth/track-login',{method:'POST',json:{}}).catch(()=>{});
+    startHeartbeat();
+  }
   // Returning from a Google OAuth flow (email or drive)?
   const h = location.hash || '';
   const addr = () => { const m = h.match(/addr=([^&]+)/); return m ? ': ' + decodeURIComponent(m[1]) : ''; };
