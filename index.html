@@ -2078,14 +2078,29 @@ async function renderUsage(){
     </tbody></table></div>` : `<div class="empty"><h3>No activity yet</h3><p>Activity appears here as users log in and work.</p></div>`;
   }catch(e){ document.getElementById('usgArea').innerHTML=`<div class="empty"><h3>Couldn't load</h3><p>${esc(e.message)}</p></div>`; }
 }
-let _fmHeartbeat=null, _fmLastPing=Date.now();
+// Idle-aware time tracking: only counts time while the tab is visible AND the
+// user has interacted within the last 5 minutes. Idle gaps (>5 min) are NOT
+// counted; when they come back, counting resumes. So 10 min + (6 h idle) + 20 min = 30 min.
+let _fmHeartbeat=null, _fmActiveMs=0, _fmLastTick=Date.now(), _fmLastInteract=Date.now();
+const FM_IDLE_MS = 5*60*1000;
+function _fmMarkInteract(){ _fmLastInteract = Date.now(); }
 function startHeartbeat(){
   if(_fmHeartbeat) return;
-  _fmLastPing = Date.now();
+  _fmLastTick = Date.now(); _fmLastInteract = Date.now(); _fmActiveMs = 0;
+  ['mousemove','mousedown','keydown','scroll','touchstart','click'].forEach(ev =>
+    window.addEventListener(ev, _fmMarkInteract, { passive:true }));
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ _fmLastTick = Date.now(); _fmLastInteract = Date.now(); } });
+  // accumulate active time every 10s (only when visible + recently interacted)
+  setInterval(()=>{
+    const now = Date.now();
+    const active = !document.hidden && (now - _fmLastInteract) <= FM_IDLE_MS;
+    if(active) _fmActiveMs += (now - _fmLastTick);
+    _fmLastTick = now;
+  }, 10000);
+  // flush the accumulated ACTIVE seconds to the server every 60s
   _fmHeartbeat = setInterval(()=>{
-    if(document.hidden){ _fmLastPing = Date.now(); return; }   // don't count time in background
-    const secs = Math.round((Date.now()-_fmLastPing)/1000); _fmLastPing = Date.now();
-    if(secs>0) api('/api/fm/auth/ping',{method:'POST',json:{ seconds: secs }}).catch(()=>{});
+    const secs = Math.round(_fmActiveMs/1000); _fmActiveMs = 0;
+    if(secs > 0) api('/api/fm/auth/ping',{method:'POST',json:{ seconds: secs }}).catch(()=>{});
   }, 60000);
 }
 
