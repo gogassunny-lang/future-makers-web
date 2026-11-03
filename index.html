@@ -1412,23 +1412,44 @@ function waPill(s){ const m={scheduled:['opt-no','Scheduled'],due:['opt-yes','Du
 async function renderWaFire(){
   renderShell(`<div class="page-head">
     <div><div class="eyebrow">Broadcast</div><h2>WhatsApp Fire</h2><p>Schedule WhatsApp campaigns. When one comes due you get it in the Fire queue and tap send on your phone — no API, no ban risk.</p></div>
-    <div class="row" style="gap:8px"><button class="btn ghost" id="waRefresh">↻ Refresh</button><button class="btn" id="waNew">+ New campaign</button></div>
+    <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn ghost" id="waRefresh">↻ Refresh</button><button class="btn ghost" id="waBulk">📋 Bulk fire</button><button class="btn" id="waNew">+ New campaign</button></div>
   </div><div id="waArea"><div class="loading">Loading…</div></div>`);
   document.getElementById('waNew').onclick = openWaModal;
+  document.getElementById('waBulk').onclick = openWaBulkModal;
   document.getElementById('waRefresh').onclick = ()=>renderWaFire();
   const area = document.getElementById('waArea');
   try {
-    const [{ queue }, { campaigns }] = await Promise.all([
+    const [{ queue: fullQueue }, { campaigns }, batchRes] = await Promise.all([
       api('/api/fm/wa/queue'),
       api('/api/fm/wa'),
+      api('/api/fm/wa/batches').catch(()=>({ batches: [] })),
+      waLoadAssignees(),
     ]);
+    const batches = (batchRes && batchRes.batches) || [];
+    state.waQueue = fullQueue;
+    const queue = fullQueue.filter(q=>!q.batch_id);          // single campaigns
+    const dueByBatch = {};                                     // batch_id -> due fires
+    fullQueue.filter(q=>q.batch_id).forEach(q=>{ (dueByBatch[q.batch_id] ||= []).push(q); });
+    const dueBatches = batches.filter(b=>dueByBatch[b.id] && dueByBatch[b.id].length);
     let html = '';
+    if(dueBatches.length){
+      html += `<div class="panel" style="margin-bottom:18px;border:1.5px solid #d97b3a">
+        <div style="padding:12px 16px;font-weight:800;color:#a0561e">🔥 Bulk fires ready to send (${dueBatches.length})</div>
+        <table><thead><tr><th>Batch</th><th>Sender</th><th>Progress</th><th></th></tr></thead><tbody>
+        ${dueBatches.map(b=>`<tr>
+          <td><b>${esc(b.title)}</b>${b.owner_name?`<div style="font-size:11px;color:var(--ink-soft)">by ${esc(b.owner_name)}</div>`:''}</td>
+          <td>${waAssigneeLabel(b.assigned_to)}</td>
+          <td>${waProgress(b)}<div style="font-size:12px;color:var(--ink-soft);margin-top:3px">${dueByBatch[b.id].length} waiting now</div></td>
+          <td><div class="row-actions"><button class="btn sm" data-wasweep="${b.id}">▶ Start sending</button></div></td>
+        </tr>`).join('')}
+        </tbody></table></div>`;
+    }
     if(queue.length){
       html += `<div class="panel" style="margin-bottom:18px;border:1.5px solid #d97b3a">
         <div style="padding:12px 16px;font-weight:800;color:#a0561e">🔥 Due to fire now (${queue.length})</div>
         <table><thead><tr><th>Campaign</th><th>Send to</th><th>Caption</th><th>Media</th><th></th></tr></thead><tbody>
         ${queue.map(q=>`<tr>
-          <td><b>${esc(q.title)}</b>${q.owner_name?`<div style="font-size:11px;color:var(--ink-soft)">by ${esc(q.owner_name)}</div>`:''}</td>
+          <td><b>${esc(q.title)}</b>${q.owner_name?`<div style="font-size:11px;color:var(--ink-soft)">by ${esc(q.owner_name)}${q.assigned_to?' · for '+esc(q.assigned_to):''}</div>`:''}</td>
           <td>${q.target_type==='person'?'👤':q.target_type==='list'?'📢':'👥'} ${esc(q.target_name)}${q.target_number?` <span style="color:var(--ink-soft)">(${esc(q.target_number)})</span>`:''}</td>
           <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(q.caption||'—')}</td>
           <td>${q.media_url?`<a href="${esc(q.media_url)}" target="_blank" rel="noopener">open</a>`:'—'}</td>
@@ -1438,6 +1459,21 @@ async function renderWaFire(){
           </div></td>
         </tr>`).join('')}
         </tbody></table></div>`;
+    }
+    if(batches.length){
+      html += `<div class="h2" style="font-size:15px;margin:0 0 8px 4px">Bulk batches (${batches.length})</div>
+      <div class="panel" style="margin-bottom:18px"><table><thead><tr><th>Batch</th><th>Sender</th><th>Progress</th><th>Created</th><th></th></tr></thead><tbody>
+      ${batches.map(b=>{ const mine = b.owner_id===(state.fmProfile&&state.fmProfile.id) || isSuperAdmin(); return `<tr>
+        <td><b>${esc(b.title)}</b>${b.owner_name?`<div style="font-size:11px;color:var(--ink-soft)">by ${esc(b.owner_name)}</div>`:''}${b.template?`<div style="font-size:12px;color:var(--ink-soft);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(b.template)}</div>`:''}</td>
+        <td>${waAssigneeLabel(b.assigned_to)}</td>
+        <td>${waProgress(b)}</td>
+        <td class="phone-cell">${waDate(b.created_at)}</td>
+        <td><div class="row-actions">
+          ${b.pending?`<button class="btn sm danger" data-wabstop="${b.id}">Stop</button>`:''}
+          ${b.stopped?`<button class="btn sm ghost" data-wabresume="${b.id}">Resume</button>`:''}
+          ${mine?`<button class="btn sm ghost" data-wabassign="${b.id}" title="Change who sends it">👤 Assign</button><button class="btn sm ghost" data-wabdel="${b.id}" title="Delete batch">🗑</button>`:''}
+        </div></td></tr>`; }).join('')}
+      </tbody></table></div>`;
     }
     html += `<div class="row" style="justify-content:space-between;align-items:center;margin:0 0 8px 4px"><div class="h2" style="font-size:15px">All campaigns (${campaigns.length})</div>${campaigns.length?`<button class="btn sm danger" id="waBulkDel">🗑 Delete selected</button>`:''}</div>`;
     html += campaigns.length ? `<div class="panel"><table><thead><tr><th style="width:34px"><input type="checkbox" id="waAll" title="Select all"/></th><th>Campaign</th><th>Target</th><th>Schedule</th><th>Status</th><th>Next / last</th><th></th></tr></thead><tbody>
@@ -1456,6 +1492,11 @@ async function renderWaFire(){
       </tr>`).join('')}
       </tbody></table></div>` : `<div class="empty"><h3>No campaigns yet</h3><p>Create your first WhatsApp campaign — schedule it now, once, or recurring.</p></div>`;
     area.innerHTML = html;
+    area.querySelectorAll('[data-wasweep]').forEach(b=> b.onclick=()=>waSweep(batches.find(x=>x.id===b.dataset.wasweep), dueByBatch[b.dataset.wasweep]||[]));
+    area.querySelectorAll('[data-wabstop]').forEach(b=> b.onclick=()=>waBatchAction(b.dataset.wabstop,'stop'));
+    area.querySelectorAll('[data-wabresume]').forEach(b=> b.onclick=()=>waBatchAction(b.dataset.wabresume,'resume'));
+    area.querySelectorAll('[data-wabdel]').forEach(b=> b.onclick=()=>waBatchDelete(batches.find(x=>x.id===b.dataset.wabdel)));
+    area.querySelectorAll('[data-wabassign]').forEach(b=> b.onclick=()=>waBatchAssign(batches.find(x=>x.id===b.dataset.wabassign)));
     area.querySelectorAll('[data-waopen]').forEach(b=> b.onclick=()=>waOpenWhatsapp((queue||[]).find(x=>x.id===b.dataset.waopen)));
     area.querySelectorAll('[data-wafire]').forEach(b=> b.onclick=()=>waFireInApp((queue||[]).find(x=>x.id===b.dataset.wafire)));
     area.querySelectorAll('[data-wafired]').forEach(b=> b.onclick=()=>waFired(b.dataset.wafired));
@@ -1734,6 +1775,256 @@ async function waAction(id, act){
   catch(e){ toast(e.message,'bad'); }
 }
 
+// ===================== BULK FIRE (list + template -> one fire per person) =====================
+function waProgress(b){
+  const total=b.total||0, sent=b.sent||0, pct=total?Math.round(sent*100/total):0;
+  return `<div style="min-width:140px"><div style="font-size:12px;font-weight:700">${sent} of ${total} sent${b.stopped?` · ${b.stopped} stopped`:''}</div>
+    <div style="height:6px;background:#f2ede8;border-radius:4px;margin-top:4px;overflow:hidden"><div style="height:100%;width:${pct}%;background:#d97b3a"></div></div></div>`;
+}
+function waAssigneeLabel(code){
+  if(!code) return '<span style="color:var(--ink-soft)">Creator</span>';
+  const u=(state.waAssignees||[]).find(x=>String(x.code).toLowerCase()===String(code).toLowerCase());
+  const meCode=String((state.fmProfile&&state.fmProfile.code)||'').toLowerCase();
+  return (String(code).toLowerCase()===meCode?'<b>You</b>':esc(u?(u.name||u.code):code))+` <span style="color:var(--ink-soft);font-size:11px">(${esc(code)})</span>`;
+}
+async function waLoadAssignees(){
+  if(state.waAssignees) return state.waAssignees;
+  try{ state.waAssignees=(await api('/api/fm/wa/assignees')).users||[]; }catch(e){ state.waAssignees=[]; }
+  return state.waAssignees;
+}
+// same rules as the server's renderTemplate()
+function waPhKey(k){ return String(k||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,''); }
+function waRenderTpl(tpl,row){
+  const name=String(row.name||'').trim();
+  const vals={ name, first_name:name.split(/\s+/)[0]||'', number:row.number||'' };
+  for(const [k,v] of Object.entries(row.vars||{})){ const key=waPhKey(k); if(key && !(key in vals)) vals[key]=v==null?'':String(v); }
+  return String(tpl||'').replace(/\{\s*([^{}]+?)\s*\}/g,(m,k)=>{ const key=waPhKey(k); return key in vals?vals[key]:m; });
+}
+// rows from a sheet: [{col:value}] -> [{name, number, vars}]
+function waBulkMapRows(json){
+  if(!json.length) return { rows:[], columns:[] };
+  const keys=Object.keys(json[0]);
+  const numKey=keys.find(k=>/(number|mobile|phone|contact|whatsapp)/i.test(k) && !/name/i.test(k))
+            || keys.find(k=>/(number|mobile|phone)/i.test(k));
+  const nameKey=keys.find(k=>/^\s*(whatsapp\s*)?name\s*$/i.test(k)) || keys.find(k=>/name/i.test(k) && k!==numKey);
+  const rows=json.map(r=>{
+    let number=numKey?String(r[numKey]||'').trim():'';
+    if(!number){ for(const k of keys){ if(String(r[k]||'').replace(/\D/g,'').length>=10){ number=String(r[k]).trim(); break; } } }
+    const vars={}; keys.forEach(k=>{ vars[k]=r[k]==null?'':String(r[k]).trim(); });
+    return { name: nameKey?String(r[nameKey]||'').trim():'', number, vars };
+  }).filter(r=>r.name||r.number);
+  return { rows, columns:keys };
+}
+async function waBulkParseFile(file){
+  const buf=await file.arrayBuffer();
+  if(window.XLSX){
+    const wb=XLSX.read(buf,{type:'array'});
+    return waBulkMapRows(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:'',raw:false}));
+  }
+  if(/\.csv$/i.test(file.name)) return waBulkParseText(new TextDecoder().decode(buf));
+  throw new Error('spreadsheet reader not loaded — check your connection and retry');
+}
+// pasted text: "Name, Number" / tab-separated (copied from Excel), header row optional
+function waBulkParseText(text){
+  const lines=String(text||'').split(/\r?\n/).filter(l=>l.trim());
+  if(!lines.length) return { rows:[], columns:[] };
+  const sep=lines[0].includes('\t')?'\t':',';
+  const split=l=>l.split(sep).map(x=>x.trim().replace(/^"|"$/g,''));
+  const first=split(lines[0]);
+  const hasHeader=!first.some(c=>c.replace(/\D/g,'').length>=10);
+  const header=hasHeader?first:first.map((c,i)=>c.replace(/\D/g,'').length>=10?'Number':(i===0?'Name':'Col'+(i+1)));
+  const json=(hasHeader?lines.slice(1):lines).map(l=>{ const p=split(l); const o={}; header.forEach((h,i)=>o[h]=p[i]||''); return o; });
+  return waBulkMapRows(json);
+}
+function waBulkValidate(rows){
+  const seen=new Set(); const ok=[], bad=[];
+  for(const r of rows){
+    const n=waNormNum(r.number); const d=n?n.replace(/\D/g,''):'';
+    if(!n || d.length<12){ bad.push({...r, reason:'invalid number'}); continue; }
+    if(seen.has(d)){ bad.push({...r, reason:'duplicate'}); continue; }
+    seen.add(d); ok.push({ ...r, number:n });
+  }
+  return { ok, bad };
+}
+function waBulkTemplateFile(){
+  const rows=[['Name','Number','City'],['Rakesh Sharma','9876543210','Pune'],['Priya Verma','9123456780','Indore']];
+  const ws=XLSX.utils.aoa_to_sheet(rows); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Bulk fire');
+  XLSX.writeFile(wb,'whatsapp_bulk_fire_template.xlsx');
+}
+
+async function openWaBulkModal(){
+  state.waBulk={ rows:[], columns:[] }; state.waPicked=null;
+  showModal(`<h3>📋 Bulk fire</h3><p class="msub">Upload a list of names + WhatsApp numbers and one message. A separate fire is created for every person — the sender then just clicks through and taps Send.</p>
+    <label class="field"><span>Batch title (internal)</span><input class="input" id="wb_title" placeholder="Diwali greetings — dealers"/></label>
+    <label class="field"><span>1 · Contacts</span>
+      <div class="row" style="gap:10px;align-items:center;flex-wrap:wrap">
+        <button type="button" class="btn sm ghost" id="wb_up">⬆ Upload Excel / CSV</button>
+        <a href="#" id="wb_tmpl" style="font-size:12px;color:var(--accent,#D65A1E)">Download sample template</a>
+        <a href="#" id="wb_pastetog" style="font-size:12px;color:var(--accent,#D65A1E)">…or paste a list</a>
+        <input type="file" id="wb_file" accept=".xlsx,.xls,.csv" style="display:none"/>
+      </div>
+      <textarea class="input" id="wb_paste" rows="4" style="display:none;margin-top:8px;resize:vertical" placeholder="Name, Number — one per line (or paste straight from Excel)&#10;Rakesh Sharma, 9876543210&#10;Priya Verma, 9123456780"></textarea>
+      <div id="wb_summary" style="font-size:12px;color:var(--ink-soft);margin-top:6px">Columns needed: a <b>Name</b> (WhatsApp name) and a <b>Number</b> column. Any extra column (City, Amount…) can be used in the message.</div>
+    </label>
+    <label class="field"><span>2 · Message template</span>
+      <textarea class="input" id="wb_tpl" rows="4" style="resize:vertical" placeholder="Dear {name}, wishing you and your family a very Happy Diwali! — Team GOGAS"></textarea>
+      <div id="wb_chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
+    </label>
+    <label class="field"><span>Video / file — optional (same for everyone)</span>
+      <div class="row" style="gap:8px;align-items:stretch">
+        <input class="input" id="wa_media" placeholder="Paste a link…" style="flex:1"/>
+        ${inWrapper()
+          ? '<span style="position:relative;display:inline-block"><button type="button" class="btn sm ghost" style="pointer-events:none">📁 Drive / File</button><input type="file" id="wa_file" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer"/></span>'
+          : '<button type="button" class="btn sm ghost" id="wa_drivebtn">📁 Drive</button>'}
+      </div>
+      <div id="wa_medianame" style="font-size:12px;color:var(--ink-soft);margin-top:4px"></div>
+    </label>
+    <label class="field"><span>3 · Who sends it?</span><select class="input" id="wb_assign"><option value="">Me</option></select>
+      <div style="font-size:12px;color:var(--ink-soft);margin-top:4px">The fires go from the WhatsApp of whoever sends them. Pick a teammate to put the batch in their Fire queue instead.</div></label>
+    <label class="field"><span>When</span><select class="input" id="wb_mode"><option value="now">Now — ready to send immediately</option><option value="once">Later — pick date &amp; time</option></select></label>
+    <div id="wb_whenbox"></div>
+    <div id="wb_preview"></div>
+    <div class="err" id="wb_err"></div>
+    <div class="modal-actions"><button class="btn ghost" id="mc">Cancel</button><button class="btn" id="mok">Create fires</button></div>`);
+  document.getElementById('mc').onclick=closeModal;
+  document.getElementById('mok').onclick=waBulkCreate;
+  document.getElementById('wb_up').onclick=()=>document.getElementById('wb_file').click();
+  document.getElementById('wb_tmpl').onclick=e=>{ e.preventDefault(); waBulkTemplateFile(); };
+  document.getElementById('wb_pastetog').onclick=e=>{ e.preventDefault(); const t=document.getElementById('wb_paste'); t.style.display=t.style.display==='none'?'block':'none'; if(t.style.display==='block') t.focus(); };
+  document.getElementById('wb_paste').oninput=e=>{ state.waBulk=waBulkParseText(e.target.value); waBulkRefresh(); };
+  document.getElementById('wb_file').onchange=async e=>{
+    const f=e.target.files[0]; e.target.value=''; if(!f) return;
+    try{ state.waBulk=await waBulkParseFile(f); state.waBulk.fileName=f.name; waBulkRefresh(); }
+    catch(err){ toast('Could not read file: '+err.message,'bad'); }
+  };
+  document.getElementById('wb_tpl').oninput=waBulkRefresh;
+  document.getElementById('wb_mode').onchange=()=>{ const b=document.getElementById('wb_whenbox'); b.innerHTML=document.getElementById('wb_mode').value==='once'?`<label class="field"><span>Date &amp; time (IST)</span><input class="input" id="wb_when" type="datetime-local"/></label>`:''; };
+  const db=document.getElementById('wa_drivebtn');
+  if(db) db.onclick=()=>openDrivePicker(d=>{ state.waPicked={ id:d.id, name:d.name, mime:d.mime }; document.getElementById('wa_media').value=d.url; document.getElementById('wa_medianame').textContent='📎 '+d.name; });
+  const fi=document.getElementById('wa_file');
+  if(fi) fi.onchange=e=>{ if(e.target.files && e.target.files[0]) waUploadToDrive(e.target.files[0]); };
+  waBulkRefresh();
+  const users=await waLoadAssignees();
+  const sel=document.getElementById('wb_assign'); if(!sel) return;
+  const meCode=String((state.fmProfile&&state.fmProfile.code)||'').toLowerCase();
+  sel.innerHTML='<option value="">Me (I will send them)</option>'+users.filter(u=>String(u.code).toLowerCase()!==meCode).map(u=>`<option value="${esc(u.code)}">${esc(u.name||u.code)} (${esc(u.code)})</option>`).join('');
+}
+function waBulkRefresh(){
+  const B=state.waBulk||{rows:[],columns:[]};
+  const { ok, bad }=waBulkValidate(B.rows);
+  const sum=document.getElementById('wb_summary');
+  if(sum && B.rows.length){
+    const dup=bad.filter(x=>x.reason==='duplicate').length, inv=bad.length-dup;
+    sum.innerHTML=`${B.fileName?'📄 '+esc(B.fileName)+' — ':''}<b style="color:var(--ink)">${ok.length} people ready</b>${inv?` · <b style="color:var(--stop,#c0392b);font-weight:600">${inv} invalid number${inv===1?'':'s'}</b>`:''}${dup?` · ${dup} duplicate${dup===1?'':'s'} removed`:''}${ok.length>500?` · <b style="color:var(--stop,#c0392b);font-weight:600">max 500 per batch — split the list</b>`:''}`
+      + (inv?`<div style="margin-top:4px">Skipped: ${bad.filter(x=>x.reason!=='duplicate').slice(0,5).map(x=>esc((x.name||'?')+' '+(x.number||''))).join(', ')}${inv>5?' …':''}</div>`:'');
+  }
+  // placeholder chips
+  const chips=document.getElementById('wb_chips');
+  if(chips){
+    const keys=['name','first_name',...(B.columns||[]).map(waPhKey).filter(k=>k && !['name','first_name','number'].includes(k))];
+    chips.innerHTML=[...new Set(keys)].map(k=>`<button type="button" class="btn sm ghost" data-ph="${esc(k)}" style="padding:3px 8px;font-size:12px">{${esc(k)}}</button>`).join('');
+    chips.querySelectorAll('[data-ph]').forEach(b=>b.onclick=()=>{ const t=document.getElementById('wb_tpl'); const p=t.selectionStart??t.value.length; t.value=t.value.slice(0,p)+'{'+b.dataset.ph+'}'+t.value.slice(t.selectionEnd??p); t.focus(); waBulkRefresh(); });
+  }
+  // preview first 3
+  const pv=document.getElementById('wb_preview'); const tpl=(document.getElementById('wb_tpl')||{}).value||'';
+  if(pv) pv.innerHTML=(ok.length && tpl.trim())?`<div style="font-size:12px;font-weight:700;margin:4px 0 6px">Preview</div>`+ok.slice(0,3).map(r=>`<div style="background:#f6fbf3;border:1px solid #dcefd2;border-radius:8px;padding:8px 10px;margin-bottom:6px;font-size:13px"><div style="font-size:11px;color:var(--ink-soft);margin-bottom:3px">👤 ${esc(r.name||'—')} · ${esc(r.number)}</div><div style="white-space:pre-wrap">${esc(waRenderTpl(tpl,r))}</div></div>`).join('')+(ok.length>3?`<div style="font-size:12px;color:var(--ink-soft)">…and ${ok.length-3} more</div>`:''):'';
+}
+async function waBulkCreate(){
+  const errEl=document.getElementById('wb_err'); errEl.textContent='';
+  const title=document.getElementById('wb_title').value.trim();
+  const template=document.getElementById('wb_tpl').value.trim();
+  const media_url=document.getElementById('wa_media').value.trim();
+  const { ok }=waBulkValidate((state.waBulk||{}).rows||[]);
+  if(!title){ errEl.textContent='Give the batch a title.'; return; }
+  if(!ok.length){ errEl.textContent='Upload or paste at least one valid name + number.'; return; }
+  if(ok.length>500){ errEl.textContent='Max 500 people per batch — split the list.'; return; }
+  if(!template && !media_url){ errEl.textContent='Write a message template (or attach a file).'; return; }
+  const left=(template.match(/\{[^{}]+\}/g)||[]).filter(ph=>waRenderTpl(ph,ok[0])===ph);
+  if(left.length && !confirm('These placeholders don\'t match any column and will be sent as-is: '+left.join(', ')+'\n\nCreate anyway?')) return;
+  const payload={ title, template, media_url,
+    media_drive_id: state.waPicked?state.waPicked.id:null, media_name: state.waPicked?state.waPicked.name:null, media_mime: state.waPicked?state.waPicked.mime:null,
+    assigned_to: document.getElementById('wb_assign').value, mode: document.getElementById('wb_mode').value,
+    rows: ok.map(r=>({ name:r.name, number:r.number, vars:r.vars })) };
+  if(payload.mode==='once'){ const w=(document.getElementById('wb_when')||{}).value; if(!w){ errEl.textContent='Pick a date & time.'; return; } payload.run_at=new Date(w).toISOString(); }
+  const btn=document.getElementById('mok'); btn.disabled=true; btn.textContent='Creating '+ok.length+' fires…';
+  try{
+    const out=await api('/api/fm/wa/bulk',{method:'POST',json:payload});
+    closeModal();
+    const who=payload.assigned_to?(' — assigned to '+payload.assigned_to):'';
+    toast('Created '+out.created+' fires'+who+(out.rejected&&out.rejected.length?' ('+out.rejected.length+' skipped)':''),'good');
+    renderWaFire();
+  }catch(e){ btn.disabled=false; btn.textContent='Create fires'; errEl.textContent=e.message; }
+}
+
+// ---- Guided sweep: open each person's chat in turn, mark sent, auto-advance ----
+function waSweep(batch, items){
+  if(!batch || !items || !items.length){ toast('Nothing waiting in this batch','bad'); return; }
+  const S={ batch, items:[...items].sort((a,b)=>(a.batch_seq||0)-(b.batch_seq||0)), i:0, sent:0, skipped:0, auto:true, changed:false };
+  state.waSweep=S;
+  const draw=()=>{
+    const q=S.items[S.i];
+    const m=document.querySelector('#modalBg .modal'); if(!m) return;
+    if(!q){
+      m.innerHTML=`<h3>✅ Batch round finished</h3><p class="msub"><b>${S.sent}</b> sent${S.skipped?` · ${S.skipped} skipped (still in the queue — run again later)`:''}.</p>
+        <div class="modal-actions"><button class="btn" id="sw_close">Done</button></div>`;
+      document.getElementById('sw_close').onclick=()=>{ closeModal(); renderWaFire(); };
+      return;
+    }
+    const msg=q.caption||'';
+    m.innerHTML=`<h3>${esc(batch.title)}</h3>
+      <p class="msub">Person <b>${S.i+1}</b> of ${S.items.length} · ${S.sent} sent this round${S.skipped?` · ${S.skipped} skipped`:''}</p>
+      <div style="height:6px;background:#f2ede8;border-radius:4px;overflow:hidden;margin-bottom:14px"><div style="height:100%;width:${Math.round(S.i*100/S.items.length)}%;background:#d97b3a"></div></div>
+      <div style="font-size:18px;font-weight:800">👤 ${esc(q.target_name||'—')}</div>
+      <div style="color:var(--ink-soft);margin-bottom:10px">${esc(q.target_number||'')}</div>
+      <div style="background:#f6fbf3;border:1px solid #dcefd2;border-radius:8px;padding:10px 12px;white-space:pre-wrap;max-height:180px;overflow:auto;font-size:13px">${esc(msg)||'<i>(no text)</i>'}${q.media_url?`<div style="margin-top:6px">📎 ${esc(q.media_name||'attachment')}</div>`:''}</div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;margin:10px 0 0"><input type="checkbox" id="sw_auto" ${S.auto?'checked':''}/> Open the next chat automatically after “Sent”</label>
+      <div class="modal-actions" style="flex-wrap:wrap;gap:8px">
+        <button class="btn ghost" id="sw_stop">Close</button>
+        <button class="btn ghost" id="sw_skip">Skip →</button>
+        <button class="btn ghost" id="sw_open">📲 Open WhatsApp</button>
+        <button class="btn" id="sw_sent">✓ Sent — next</button>
+      </div>`;
+    document.getElementById('sw_auto').onchange=e=>{ S.auto=e.target.checked; };
+    document.getElementById('sw_open').onclick=()=>waSweepOpen(q);
+    document.getElementById('sw_skip').onclick=()=>{ S.skipped++; S.i++; draw(); if(S.auto && S.items[S.i]) waSweepOpen(S.items[S.i]); };
+    document.getElementById('sw_stop').onclick=()=>{ closeModal(); if(S.changed) renderWaFire(); };
+    document.getElementById('sw_sent').onclick=async ()=>{
+      const b=document.getElementById('sw_sent'); b.disabled=true; b.textContent='Saving…';
+      try{ await api('/api/fm/wa/'+q.id+'/fired',{method:'POST',json:{}}); S.sent++; S.changed=true; S.i++; draw(); if(S.auto && S.items[S.i]) waSweepOpen(S.items[S.i]); }
+      catch(e){ b.disabled=false; b.textContent='✓ Sent — next'; toast(e.message,'bad'); }
+    };
+  };
+  showModal('<div></div>');
+  const bg=document.getElementById('modalBg'); if(bg) bg.onclick=null;   // don't lose progress on a stray click
+  draw();
+  waSweepOpen(S.items[0]);
+}
+function waSweepOpen(q){ if(!q) return; if(canFire()) waFireInApp(q); else waOpenWhatsapp(q); }
+
+async function waBatchAction(id, act){
+  if(act==='stop' && !confirm('Stop all unsent fires in this batch? You can resume later.')) return;
+  try{ await api('/api/fm/wa/batches/'+id+'/'+act,{method:'POST',json:{}}); toast(act==='stop'?'Batch stopped':'Batch resumed','good'); renderWaFire(); }
+  catch(e){ toast(e.message,'bad'); }
+}
+async function waBatchDelete(b){
+  if(!b || !confirm('Delete batch "'+b.title+'" and all its '+b.total+' fires permanently?')) return;
+  try{ await api('/api/fm/wa/batches/'+b.id,{method:'DELETE'}); toast('Batch deleted','good'); renderWaFire(); }
+  catch(e){ toast(e.message,'bad'); }
+}
+async function waBatchAssign(b){
+  if(!b) return;
+  const users=await waLoadAssignees();
+  showModal(`<h3>Who sends “${esc(b.title)}”?</h3><p class="msub">The unsent fires move to that person's Fire queue and go from their WhatsApp.</p>
+    <label class="field"><span>Sender</span><select class="input" id="ba_sel"><option value="">Me / creator</option>${users.map(u=>`<option value="${esc(u.code)}" ${String(b.assigned_to||'').toLowerCase()===String(u.code).toLowerCase()?'selected':''}>${esc(u.name||u.code)} (${esc(u.code)})</option>`).join('')}</select></label>
+    <div class="err" id="ba_err"></div>
+    <div class="modal-actions"><button class="btn ghost" id="mc">Cancel</button><button class="btn" id="mok">Save</button></div>`);
+  document.getElementById('mc').onclick=closeModal;
+  document.getElementById('mok').onclick=async ()=>{
+    try{ await api('/api/fm/wa/batches/'+b.id+'/assign',{method:'POST',json:{ assigned_to: document.getElementById('ba_sel').value }}); closeModal(); toast('Sender updated','good'); renderWaFire(); }
+    catch(e){ document.getElementById('ba_err').textContent=e.message; }
+  };
+}
+
 function openWaModal(){
   showModal(`<h3>New WhatsApp campaign</h3><p class="msub">Schedules a campaign. When it's due you tap send on your phone.</p>
     <label class="field"><span>Campaign title (internal)</span><input class="input" id="wa_title" placeholder="Morning safety instruction"/></label>
@@ -1749,7 +2040,7 @@ function openWaModal(){
       <div id="wa_medianame" style="font-size:12px;color:var(--ink-soft);margin-top:4px">${inWrapper() ? 'Tap “Drive / File” → choose from your Google Drive (or phone). It saves to your Drive and attaches automatically when you fire.' : ''}</div>
     </label>
     <label class="field"><span>Caption / message</span><textarea class="input" id="wa_caption" rows="3" style="resize:vertical" placeholder="Good morning team! Today's targets attached."></textarea></label>
-    <label class="field"><span>Assign to (who fires it) — optional</span><input class="input" id="wa_assign" placeholder="e.g. SG001 or 'Front desk tablet'"/></label>
+    <label class="field"><span>Assign to (who fires it) — optional</span><input class="input" id="wa_assign" list="wa_assignees" placeholder="Leave blank to fire it yourself, or pick a user code"/><datalist id="wa_assignees"></datalist></label>
     <label class="field"><span>When</span><select class="input" id="wa_mode"><option value="now">Now (put in the fire queue immediately)</option><option value="once">Once — pick date &amp; time</option><option value="recurring">Recurring</option></select></label>
     <div id="wa_sched"></div>
     <div class="err" id="wa_err"></div>
@@ -1764,6 +2055,7 @@ function openWaModal(){
   if(fi){ fi.onchange = e => { if(e.target.files && e.target.files[0]) waUploadToDrive(e.target.files[0]); }; }
   waTargetChange();
   waModeChange();
+  waLoadAssignees().then(list=>{ const dl=document.getElementById('wa_assignees'); if(dl) dl.innerHTML=list.map(u=>`<option value="${esc(u.code)}">${esc(u.name||u.code)}</option>`).join(''); });
   // #1 — restore any draft saved before an app reload, then auto-save on every keystroke
   waRestoreDraft();
   try {
